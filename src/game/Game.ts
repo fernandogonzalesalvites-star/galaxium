@@ -38,6 +38,11 @@ export class Game implements InputHandlers {
 
   constructor(private readonly view: SceneView) {}
 
+  private readonly stepAndRecord = (dt: number): void => {
+    this.world.step(dt);
+    this.view.recordTrails(this.world);
+  };
+
   attach(hud: Hud, input: TouchInput): void {
     this.hud = hud;
     this.input = input;
@@ -56,7 +61,7 @@ export class Game implements InputHandlers {
       this.view.render();
       return;
     }
-    this.clock.advance(seconds, (dt) => this.world.step(dt));
+    this.clock.advance(seconds, this.stepAndRecord);
     this.view.sync(this.world, this.clock.alpha);
     this.view.render();
     const paused = this.mode.kind !== 'idle';
@@ -81,10 +86,15 @@ export class Game implements InputHandlers {
       this.hud.toast(`Máximo de ${MAX_BODIES} cuerpos`);
       return;
     }
+    const isMoon = PLANET_PRESETS[type].isMoon;
+    if (isMoon && !this.world.bodies.some((b) => b.kind !== 'star' && b.parentId === null)) {
+      this.hud.toast('Primero añade un planeta');
+      return;
+    }
     this.pauseForPlacement();
     this.select(null);
     this.view.ghost.hide();
-    if (PLANET_PRESETS[type].isMoon) {
+    if (isMoon) {
       this.mode = { kind: 'choosingMoonParent', type };
       this.setPlacingInput(false);
       this.setHint(HINT_CHOOSE_PARENT);
@@ -110,9 +120,13 @@ export class Game implements InputHandlers {
       }
       const preset = PLANET_PRESETS[this.mode.type];
       const band = moonBand(this.world, planet, preset);
+      if (band.min >= band.max) {
+        this.hud.toast('Este planeta no puede tener lunas de ese tamaño');
+        return;
+      }
       this.mode = { kind: 'placing', type: this.mode.type, parentId: planet.id };
       this.setPlacingInput(true);
-      this.view.follow(planet.id, this.world, Number.isFinite(band.max) ? band.max * 3 : undefined);
+      this.view.follow(planet.id, this.world, Number.isFinite(band.max) ? this.view.distanceToFit(band.max, 3) : undefined);
       this.setHint(HINT_MOON);
       return;
     }

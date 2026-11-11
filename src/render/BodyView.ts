@@ -2,9 +2,11 @@ import * as THREE from 'three';
 import type { Body } from '../sim/body';
 import type { Vec3 } from '../sim/vec';
 import { visualRadius } from '../sim/scale';
+import { DT } from '../sim/units';
+import { TRAIL_LENGTH, TrailHistory } from './trail';
 import { markerTexture } from './markerTexture';
 
-export const TRAIL_LENGTH = 200;
+export { TRAIL_LENGTH };
 /** Tamaño en pantalla del punto marcador (sprite sin atenuación) */
 const MARKER_SCALE = 0.012;
 /** Por debajo de este radio aparente (px) se muestra el marcador */
@@ -23,15 +25,11 @@ export class BodyView {
   readonly trail: THREE.Line<THREE.BufferGeometry, THREE.LineBasicMaterial>;
   /** Radio aparente en píxeles, actualizado en cada update */
   screenRadiusPx = 0;
-  /** Años simulados entre puntos de la estela */
-  trailInterval = 0.02;
+  /** Historial de la estela, rellenado por substep desde SceneView.recordTrails */
+  readonly history = new TrailHistory();
   private readonly mesh: THREE.Mesh<THREE.SphereGeometry, THREE.MeshBasicMaterial | THREE.MeshStandardMaterial>;
   private readonly marker: THREE.Sprite;
   private readonly color: THREE.Color;
-  /** Puntos de la estela relativos a su centro (UA), en búfer circular */
-  private readonly trailPoints = new Float64Array(TRAIL_LENGTH * 3);
-  private trailCount = 0;
-  private trailHead = 0;
   private lastTrailTime = -Infinity;
 
   constructor(body: Body) {
@@ -71,39 +69,32 @@ export class BodyView {
     const halfFov = THREE.MathUtils.degToRad(camera.fov / 2);
     this.screenRadiusPx = (r / (dist * Math.tan(halfFov))) * (viewportHeightPx / 2);
     this.marker.visible = this.screenRadiusPx < MARKER_HIDE_PX;
-    this.updateTrail(p, focus, center, time);
+    this.updateTrail(p, alpha, focus, center, time);
   }
 
-  private updateTrail(p: Vec3, focus: Vec3, center: Vec3 | null, time: number): void {
+  private updateTrail(p: Vec3, alpha: number, focus: Vec3, center: Vec3 | null, time: number): void {
     const geometry = this.trail.geometry;
     if (!center) {
       geometry.setDrawRange(0, 0);
       return;
     }
-    if (time < this.lastTrailTime) {
-      this.trailCount = 0;
-      this.lastTrailTime = -Infinity;
-    }
-    if (time - this.lastTrailTime >= this.trailInterval) {
-      const i = this.trailHead * 3;
-      this.trailPoints[i] = p.x - center.x;
-      this.trailPoints[i + 1] = p.y - center.y;
-      this.trailPoints[i + 2] = p.z - center.z;
-      this.trailHead = (this.trailHead + 1) % TRAIL_LENGTH;
-      this.trailCount = Math.min(this.trailCount + 1, TRAIL_LENGTH);
-      this.lastTrailTime = time;
-    }
+    if (time < this.lastTrailTime) this.history.reset();
+    this.lastTrailTime = time;
     const pos = geometry.getAttribute('position') as THREE.BufferAttribute;
     const col = geometry.getAttribute('color') as THREE.BufferAttribute;
-    const n = this.trailCount;
-    const start = (this.trailHead - n + TRAIL_LENGTH) % TRAIL_LENGTH;
     const cx = center.x - focus.x, cy = center.y - focus.y, cz = center.z - focus.z;
-    for (let k = 0; k < n; k++) {
-      const j = ((start + k) % TRAIL_LENGTH) * 3;
-      pos.setXYZ(k, this.trailPoints[j] + cx, this.trailPoints[j + 1] + cy, this.trailPoints[j + 2] + cz);
+    const renderTime = time - (1 - alpha) * DT;
+    const minTime = time - this.history.period;
+    // Primera pasada: cuántos puntos hay, para repartir el degradado
+    let n = 0;
+    this.history.forEachVisible(minTime, renderTime, () => { n++; });
+    let k = 0;
+    this.history.forEachVisible(minTime, renderTime, (rx, ry, rz) => {
+      pos.setXYZ(k, rx + cx, ry + cy, rz + cz);
       const fade = ((k + 1) / (n + 1)) * 0.8;
       col.setXYZ(k, this.color.r * fade, this.color.g * fade, this.color.b * fade);
-    }
+      k++;
+    });
     // El último vértice es la posición actual, para que la estela llegue hasta el cuerpo
     pos.setXYZ(n, p.x - focus.x, p.y - focus.y, p.z - focus.z);
     col.setXYZ(n, this.color.r * 0.8, this.color.g * 0.8, this.color.b * 0.8);

@@ -5,7 +5,9 @@ import type { Vec3 } from '../sim/vec';
 import type { World } from '../sim/world';
 import { centerOfMass, centralMassFor, relativeOrbit, type MassPoint } from '../sim/elements';
 import { visualRadius } from '../sim/scale';
-import { BodyView, TRAIL_LENGTH, interpolated } from './BodyView';
+import { BodyView, interpolated } from './BodyView';
+import { fitDistance } from './cameraFit';
+import { TRAIL_LENGTH } from './trail';
 import { GhostView } from './GhostView';
 import { createStarfield } from './starfield';
 
@@ -64,7 +66,7 @@ export class SceneView {
     const height = this.renderer.domElement.clientHeight;
     for (const b of world.bodies) {
       const view = this.views.get(b.id)!;
-      if (refresh) view.trailInterval = this.trailIntervalFor(world, b);
+      if (refresh) this.applyTrailTiming(view, world, b);
       const center = this.trailCenter(world, b, stars.length, starCenter, alpha);
       view.update(b, alpha, this.focus, center, world.time, this.camera, height);
     }
@@ -132,7 +134,7 @@ export class SceneView {
       extent = Math.max(extent, Math.hypot(b.x - c.x, b.y - c.y, b.z - c.z) + visualRadius(b) * 4);
     }
     Object.assign(this.focus, { x: c.x, y: c.y, z: c.z });
-    this.placeCamera(extent * 2.5);
+    this.placeCamera(this.distanceToFit(extent, 2.5));
   }
 
   private placeCamera(distance: number): void {
@@ -149,7 +151,7 @@ export class SceneView {
       alive.add(b.id);
       if (!this.views.has(b.id)) {
         const view = new BodyView(b);
-        view.trailInterval = this.trailIntervalFor(world, b);
+        this.applyTrailTiming(view, world, b);
         this.views.set(b.id, view);
         this.scene.add(view.group, view.trail);
       }
@@ -163,11 +165,56 @@ export class SceneView {
     }
   }
 
-  private trailIntervalFor(world: World, b: Body): number {
+  private applyTrailTiming(view: BodyView, world: World, b: Body): void {
+    const { interval, period } = this.trailIntervalFor(world, b);
+    view.history.interval = interval;
+    view.history.period = period;
+  }
+
+  private trailIntervalFor(world: World, b: Body): { interval: number; period: number } {
     const central = centralMassFor(world, b);
-    if (!central) return DEFAULT_TRAIL_INTERVAL;
-    const orbit = relativeOrbit(b, central);
-    return orbit.bound ? orbit.period / TRAIL_LENGTH : DEFAULT_TRAIL_INTERVAL;
+    if (central) {
+      const orbit = relativeOrbit(b, central);
+      if (orbit.bound) return { interval: orbit.period / TRAIL_LENGTH, period: orbit.period };
+    }
+    return { interval: DEFAULT_TRAIL_INTERVAL, period: DEFAULT_TRAIL_INTERVAL * TRAIL_LENGTH };
+  }
+
+  /** Distancia de cámara para que `radius * factor` quepa según la relación de aspecto actual. */
+  distanceToFit(radius: number, factor: number): number {
+    return fitDistance(radius, factor, this.camera.aspect);
+  }
+
+  /** Llamado tras cada substep: anota en el historial las posiciones que tocan. */
+  recordTrails(world: World): void {
+    let starCount = 0;
+    let cx = 0, cy = 0, cz = 0;
+    let haveCenter = false;
+    for (const b of world.bodies) {
+      const view = this.views.get(b.id);
+      if (!view || world.time < view.history.nextTime) continue;
+      let ox: number, oy: number, oz: number;
+      if (b.parentId !== null) {
+        const parent = world.get(b.parentId);
+        if (!parent) continue;
+        ox = parent.x; oy = parent.y; oz = parent.z;
+      } else {
+        if (!haveCenter) {
+          let m = 0;
+          for (const s of world.bodies) {
+            if (s.kind !== 'star') continue;
+            starCount++;
+            m += s.mass;
+            cx += s.x * s.mass; cy += s.y * s.mass; cz += s.z * s.mass;
+          }
+          if (m > 0) { cx /= m; cy /= m; cz /= m; } else starCount = 0;
+          haveCenter = true;
+        }
+        if (starCount === 0 || (b.kind === 'star' && starCount < 2)) continue;
+        ox = cx; oy = cy; oz = cz;
+      }
+      view.history.maybeRecord(world.time, b.x - ox, b.y - oy, b.z - oz);
+    }
   }
 
   /** Centro respecto al que se dibuja la estela: planeta padre o estrellas. */
