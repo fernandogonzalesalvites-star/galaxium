@@ -39,6 +39,13 @@ describe('planetas', () => {
     expect(c.warning).toBe('Demasiado cerca de la estrella');
   });
 
+  it('bloquea colocar encima de una de las dos estrellas', () => {
+    const w = createStarSystem('binary');
+    const c = checkPlanetPlacement(w, 0.1, 0);
+    expect(c.ok).toBe(false);
+    expect(c.warning).toBe('Demasiado cerca de la estrella');
+  });
+
   it('avisa (sin bloquear) cerca de las dos estrellas de un sistema doble', () => {
     const w = createStarSystem('binary');
     const near = checkPlanetPlacement(w, 0.4, 0);

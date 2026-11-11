@@ -43,8 +43,9 @@ export function checkPlanetPlacement(world: World, x: number, z: number): Placem
   const c = centerOfMass(stars);
   const center = { x: c.x, y: c.y, z: c.z };
   const radius = Math.hypot(x - c.x, z - c.z);
-  const maxStarRadius = Math.max(...stars.map((s) => visualRadius(s)));
-  if (radius < maxStarRadius * MIN_STAR_CLEARANCE) {
+  const tooClose = stars.some((s) =>
+    Math.hypot(x - s.x, z - s.z) < visualRadius(s) * MIN_STAR_CLEARANCE);
+  if (tooClose) {
     return { ok: false, warning: 'Demasiado cerca de la estrella', radius, center };
   }
   if (stars.length >= 2) {
