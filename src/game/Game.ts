@@ -3,7 +3,7 @@ import type { Hud } from '../ui/Hud';
 import type { InputHandlers, TouchInput } from '../input/TouchInput';
 import type { EditorResult, PreviewTone } from '../ui/Editor';
 import { World } from '../sim/world';
-import { createStarSystem, STAR_CHOICES, type StarType } from '../sim/stars';
+import { createStarSystem, SINGLE_STARS, STAR_CHOICES, type StarType } from '../sim/stars';
 import { PLANET_PRESETS, type PlanetType } from '../sim/planetTypes';
 import { centerOfMass } from '../sim/elements';
 import { visualRadius } from '../sim/scale';
@@ -14,11 +14,11 @@ import { formatDistance, formatTemperature } from '../ui/format';
 import { SimClock } from './clock';
 import {
   checkMoonPlacement, checkPlanetPlacement, moonBand, moonBandFor, placeMoon, placePlanet, presetRadius,
-  type PlacementCheck,
+  checkStarPlacement, placeStar, starVisualRadius, MAX_STARS, type PlacementCheck,
 } from './placement';
 import {
   applyBodyEdit, applyStarType, deleteBody, editRanges, editValues, isMoon, previewHabitability, previewZone,
-  starTypeOf, canHaveRing, defaultRing, applyStarLook, starRadiusRange,
+  starTypeOf, canHaveRing, defaultRing, applyStarLook, starRadiusRange, type SingleStarType,
 } from './editing';
 import { restoreWorld, snapshot, type SaveData } from './save';
 import { createDemoSystem } from './demo';
@@ -27,6 +27,7 @@ type Mode =
   | { kind: 'idle' }
   | { kind: 'choosingMoonParent'; type: PlanetType }
   | { kind: 'placing'; type: PlanetType; parentId: number | null }
+  | { kind: 'placingStar'; type: SingleStarType }
   | { kind: 'editing'; id: number };
 
 const GHOST_TEMPERATE = 0x50e080;
@@ -36,7 +37,8 @@ const GHOST_WARNING = 0xffa040;
 const GHOST_BLOCKED = 0xff3030;
 const HINT_PLANET = 'Arrastra para elegir la órbita y suelta para colocar';
 const HINT_CHOOSE_PARENT = 'Toca el planeta que tendrá la luna';
-const HINT_MOON = 'Arrastra alrededor del planeta y suelta para colocar la luna';
+const HINT_STAR = 'Arrastra para elegir dónde orbitará la nueva estrella y suelta para colocarla';
+const HINT_MOON ='Arrastra alrededor del planeta y suelta para colocar la luna';
 const INFO_REFRESH_MS = 250;
 /** Velocidad del fondo del menú (×10: las estrellas dan una vuelta cada ~3 s) */
 const DEMO_SPEED_INDEX = 2;
@@ -190,8 +192,71 @@ export class Game implements InputHandlers {
     }
   }
 
+  /** Empieza a colocar una estrella nueva, que orbitará alrededor de las que ya hay. */
+  requestAddStar(type: SingleStarType): void {
+    if (!this.started || this.mode.kind === 'editing') return;
+    if (this.world.bodies.length >= MAX_BODIES) {
+      this.hud.toast(`Máximo de ${MAX_BODIES} cuerpos`);
+      return;
+    }
+    if (this.world.stars().length >= MAX_STARS) {
+      this.hud.toast(`Máximo de ${MAX_STARS} estrellas`);
+      return;
+    }
+    this.pause();
+    this.select(null);
+    this.view.ghost.hide();
+    this.mode = { kind: 'placingStar', type };
+    this.setPlacingInput(true);
+    this.setHint(HINT_STAR);
+  }
+
   cancelPlacement(): void {
     this.exitMode();
+  }
+
+  private moveStarGhost(x: number, y: number): { check: PlacementCheck; pos: { x: number; z: number } } | null {
+    if (this.mode.kind !== 'placingStar') return null;
+    const spec = SINGLE_STARS[this.mode.type];
+    const simY = centerOfMass(this.world.stars()).y;
+    const pos = this.view.planePoint(x, y, simY);
+    if (!pos) return null;
+    const check = checkStarPlacement(this.world, spec, pos.x, pos.z);
+    this.view.ghost.show(
+      {
+        center: check.center,
+        radius: check.radius,
+        bodyPos: { x: pos.x, y: simY, z: pos.z },
+        bodyRadius: starVisualRadius(spec),
+        color: !check.ok ? GHOST_BLOCKED : check.warning ? GHOST_WARNING : spec.color,
+        band: null,
+      },
+      this.view.focus,
+    );
+    this.hud.showPlacement(this.hint, check.warning, !check.ok, {
+      text: `${spec.name} · a ${formatDistance(check.radius, false)} del centro`,
+      tone: 'neutral',
+    });
+    return { check, pos };
+  }
+
+  private releaseStar(x: number, y: number): void {
+    if (this.mode.kind !== 'placingStar') return;
+    const spec = SINGLE_STARS[this.mode.type];
+    const result = this.moveStarGhost(x, y);
+    if (!result) return;
+    if (!result.check.ok) {
+      this.hud.toast(result.check.warning ?? 'No se puede colocar aquí');
+      return;
+    }
+    const star = placeStar(this.world, spec, result.pos.x, result.pos.z);
+    this.world.removeNetMomentum();
+    this.world.snapRenderState();
+    // Las estelas de todos cambian de centro: se empiezan de nuevo
+    for (const b of this.world.bodies) this.view.resetTrails(this.world, b.id);
+    this.exitMode();
+    this.hud.toast(`Se ha añadido ${star.name}`);
+    this.select(star.id);
   }
 
   // ── Ficha y editor ─────────────────────────────────────────
@@ -223,7 +288,8 @@ export class Game implements InputHandlers {
         ranges: star ? undefined : editRanges(this.world, body),
         isMoon: isMoon(body),
         hasWater: body.kind === 'rocky',
-        canDelete: !star,
+        // Una estrella se puede borrar si queda al menos otra
+        canDelete: !star || this.world.stars().length > 1,
         canHaveRing: canHaveRing(body),
         defaultRing: defaultRing(body),
         seed: body.id,
@@ -322,7 +388,7 @@ export class Game implements InputHandlers {
       this.setHint(HINT_MOON);
       return;
     }
-    if (this.mode.kind === 'placing') return;
+    if (this.mode.kind === 'placing' || this.mode.kind === 'placingStar') return;
     this.select(id);
   }
 
@@ -335,6 +401,10 @@ export class Game implements InputHandlers {
   }
 
   onPlacementMove(x: number, y: number): void {
+    if (this.mode.kind === 'placingStar') {
+      this.moveStarGhost(x, y);
+      return;
+    }
     const result = this.evaluatePlacement(x, y);
     if (!result || this.mode.kind !== 'placing') return;
     const { check, pos, y: simY } = result;
@@ -361,6 +431,10 @@ export class Game implements InputHandlers {
   }
 
   onPlacementRelease(x: number, y: number): void {
+    if (this.mode.kind === 'placingStar') {
+      this.releaseStar(x, y);
+      return;
+    }
     const result = this.evaluatePlacement(x, y);
     if (!result || this.mode.kind !== 'placing') return;
     const { check, pos } = result;

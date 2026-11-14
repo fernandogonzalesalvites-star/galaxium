@@ -20,6 +20,7 @@ const game = new Game(view);
 const hud = new Hud(app, {
   onSpeed: (i) => game.setSpeed(i),
   onAdd: (type) => game.requestAdd(type),
+  onAddStar: (type) => game.requestAddStar(type),
   onCancelPlacement: () => game.cancelPlacement(),
   onFrameSystem: () => game.frameSystem(),
   onEdit: () => game.editSelected(),

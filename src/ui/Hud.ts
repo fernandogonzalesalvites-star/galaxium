@@ -1,4 +1,6 @@
 import { SPEED_LEVELS } from '../game/clock';
+import { SINGLE_STAR_TYPES, type SingleStarType } from '../game/editing';
+import { SINGLE_STARS } from '../sim/stars';
 import { PLANET_PRESETS, PLANET_TYPES, type PlanetType } from '../sim/planetTypes';
 import { formatElapsed, formatSpeed } from './format';
 import type { BodyInfo } from './bodyInfo';
@@ -7,6 +9,8 @@ import { Editor, type EditorHandlers, type EditorModel, type PreviewTone } from 
 export interface HudHandlers {
   onSpeed(index: number): void;
   onAdd(type: PlanetType): void;
+  /** Añadir una estrella más al sistema */
+  onAddStar(type: SingleStarType): void;
   onCancelPlacement(): void;
   onFrameSystem(): void;
   onEdit(): void;
@@ -88,14 +92,32 @@ export class Hud {
     const add = el('button', 'hud-btn hud-add', '＋');
     add.title = 'Añadir cuerpo';
     add.onclick = () => this.addMenu.classList.toggle('hidden');
+    // Dos columnas: planetas y lunas a un lado, estrellas al otro
+    const planets = el('div', 'hud-add-column');
+    planets.append(el('span', 'hud-add-title', 'Planetas'));
     for (const type of PLANET_TYPES) {
       const b = el('button', 'hud-btn hud-add-item', PLANET_PRESETS[type].label);
       b.onclick = () => {
         this.addMenu.classList.add('hidden');
         h.onAdd(type);
       };
-      this.addMenu.append(b);
+      planets.append(b);
     }
+    const stars = el('div', 'hud-add-column');
+    stars.append(el('span', 'hud-add-title', 'Estrellas'));
+    for (const type of SINGLE_STAR_TYPES) {
+      const spec = SINGLE_STARS[type];
+      const b = el('button', 'hud-btn hud-add-item hud-add-star');
+      const dot = el('span', 'hud-add-dot');
+      dot.style.background = `#${spec.color.toString(16).padStart(6, '0')}`;
+      b.append(dot, document.createTextNode(spec.name === 'Sol' ? 'Tipo Sol' : spec.name));
+      b.onclick = () => {
+        this.addMenu.classList.add('hidden');
+        h.onAddStar(type);
+      };
+      stars.append(b);
+    }
+    this.addMenu.append(planets, stars);
 
     const bottom = el('div', 'hud-bottom');
     bottom.append(timeWrap, add);

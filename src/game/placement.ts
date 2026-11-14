@@ -6,7 +6,8 @@ import {
   centerOfMass, centralMassFor, relativeOrbit, circularSpeed, hillRadius, rocheLimit,
 } from '../sim/elements';
 import { visualRadius } from '../sim/scale';
-import { EARTH_MASS, EARTH_RADIUS_AU } from '../sim/units';
+import { EARTH_MASS, EARTH_RADIUS_AU, SOLAR_RADIUS_AU } from '../sim/units';
+import type { StarSpec } from '../sim/stars';
 
 export interface PlacementCheck {
   ok: boolean;
@@ -33,6 +34,76 @@ export function nextName(world: World, prefix: string): string {
   let n = 1;
   while (names.has(`${prefix} ${n}`)) n++;
   return `${prefix} ${n}`;
+}
+
+/** Como mucho tantas estrellas en un sistema (más se vuelve un caos ingobernable) */
+export const MAX_STARS = 4;
+
+/** Radio dibujado (UA) de una estrella nueva de ese tipo. */
+export function starVisualRadius(spec: StarSpec): number {
+  return visualRadius({ kind: 'star', radius: spec.radiusSolar * SOLAR_RADIUS_AU });
+}
+
+/**
+ * ¿Se puede poner aquí una estrella nueva? Orbitará alrededor de las
+ * estrellas que ya hay. No puede quedar pegada a otra estrella ni a un planeta;
+ * si hay planetas a una distancia parecida, avisa de que pueden salir despedidos.
+ */
+export function checkStarPlacement(world: World, spec: StarSpec, x: number, z: number): PlacementCheck {
+  const stars = world.stars();
+  if (stars.length === 0) {
+    return { ok: false, warning: 'No hay ninguna estrella', radius: 0, center: { x: 0, y: 0, z: 0 } };
+  }
+  const c = centerOfMass(stars);
+  const center = { x: c.x, y: c.y, z: c.z };
+  const radius = Math.hypot(x - c.x, z - c.z);
+  const own = starVisualRadius(spec);
+  if (stars.some((s) => Math.hypot(x - s.x, z - s.z) < (visualRadius(s) + own) * MIN_STAR_CLEARANCE)) {
+    return { ok: false, warning: 'Demasiado cerca de otra estrella', radius, center };
+  }
+  if (world.bodies.some((b) => b.kind !== 'star' && Math.hypot(x - b.x, z - b.z) < own * MIN_STAR_CLEARANCE + visualRadius(b))) {
+    return { ok: false, warning: 'Demasiado cerca de un planeta', radius, center };
+  }
+  const disturbed = world.bodies.some((b) => {
+    if (b.kind === 'star' || b.parentId !== null) return false;
+    const r = Math.hypot(b.x - c.x, b.z - c.z);
+    return r > radius / 3 && r < radius * 3;
+  });
+  return { ok: true, warning: disturbed ? 'Los planetas cercanos pueden salir despedidos' : null, radius, center };
+}
+
+/** Nombre de la estrella nueva: «Gigante roja», o «Gigante roja 2» si ya hay una. */
+function starName(world: World, base: string): string {
+  const names = new Set(world.bodies.map((b) => b.name));
+  if (!names.has(base)) return base;
+  let n = 2;
+  while (names.has(`${base} ${n}`)) n++;
+  return `${base} ${n}`;
+}
+
+/**
+ * Añade una estrella en órbita circular alrededor de las que ya hay (como un
+ * sistema doble). Después hay que llamar a removeNetMomentum para que el
+ * conjunto no se desplace.
+ */
+export function placeStar(world: World, spec: StarSpec, x: number, z: number): Body {
+  const c = centerOfMass(world.stars());
+  const dx = x - c.x, dz = z - c.z;
+  const r = Math.hypot(dx, dz);
+  const v = circularSpeed(c.mass, spec.mass, r);
+  return world.add({
+    name: starName(world, spec.name),
+    kind: 'star',
+    mass: spec.mass,
+    radius: spec.radiusSolar * SOLAR_RADIUS_AU,
+    luminosity: spec.luminosity,
+    color: spec.color,
+    pulsar: spec.pulsar ?? false,
+    x, y: c.y, z,
+    vx: c.vx + (v * dz) / r,
+    vy: c.vy,
+    vz: c.vz - (v * dx) / r,
+  });
 }
 
 export function checkPlanetPlacement(world: World, x: number, z: number): PlacementCheck {
