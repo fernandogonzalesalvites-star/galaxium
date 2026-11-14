@@ -1,4 +1,4 @@
-import type { Body } from '../sim/body';
+import type { Body, Ring } from '../sim/body';
 import type { World } from '../sim/world';
 import { centerOfMass, centralMassFor, circularSpeed } from '../sim/elements';
 import { visualRadius } from '../sim/scale';
@@ -27,6 +27,28 @@ export interface BodyEdit {
   atmosphere: number;
   water: number;
   color: number;
+  /** Anillos (solo planetas; null = sin anillos) */
+  ring: Ring | null;
+  /** Imagen de la superficie como data URL (null = color liso) */
+  texture: string | null;
+}
+
+/** Límites de los anillos: radio exterior (en radios del planeta) e inclinación (grados). */
+export const RING_OUTER: Range = { min: 1.6, max: 3.5 };
+export const RING_TILT: Range = { min: 0, max: 60 };
+/** Radio interior de los anillos, en radios del planeta */
+export const RING_INNER = 1.25;
+
+/** Anillos con los que empieza un planeta al activarlos. */
+export function defaultRing(body: Pick<Body, 'kind'>): Ring {
+  return body.kind === 'ice'
+    ? { color: 0x9fb8c8, outer: 2, tilt: 25 }
+    : { color: 0xd9c7a0, outer: 2.4, tilt: 20 };
+}
+
+/** Puede tener anillos: planetas (no estrellas ni lunas). */
+export function canHaveRing(body: Pick<Body, 'kind' | 'parentId'>): boolean {
+  return body.kind !== 'star' && body.parentId === null;
 }
 
 export interface EditRanges {
@@ -64,6 +86,8 @@ export function editValues(world: World, body: Body): BodyEdit {
     atmosphere: body.atmosphere,
     water: body.water,
     color: body.color,
+    ring: body.ring ? { ...body.ring } : null,
+    texture: body.texture,
   };
 }
 
@@ -157,6 +181,10 @@ export function applyBodyEdit(world: World, body: Body, edit: BodyEdit): boolean
   body.atmosphere = clamp01(edit.atmosphere);
   body.water = body.kind === 'rocky' ? clamp01(edit.water) : 0;
   body.color = edit.color;
+  body.ring = edit.ring && canHaveRing(body)
+    ? { color: edit.ring.color, outer: clamp(edit.ring.outer, RING_OUTER), tilt: clamp(edit.ring.tilt, RING_TILT) }
+    : null;
+  body.texture = edit.texture;
   world.invalidate();
   if (Math.abs(edit.distance - before) <= before * 1e-6) return false;
   const range = editRanges(world, body).distance;

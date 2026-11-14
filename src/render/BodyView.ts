@@ -5,6 +5,9 @@ import { visualRadius } from '../sim/scale';
 import { DT } from '../sim/units';
 import { TRAIL_LENGTH, TrailHistory } from './trail';
 import { markerTexture } from './markerTexture';
+import { RingView } from './RingView';
+
+const textureLoader = new THREE.TextureLoader();
 
 export { TRAIL_LENGTH };
 /** Tamaño en pantalla del punto marcador (sprite sin atenuación) */
@@ -33,6 +36,10 @@ export class BodyView {
   private colorHex: number;
   private readonly light: THREE.PointLight | null = null;
   private lastTrailTime = -Infinity;
+  private ring: RingView | null = null;
+  private ringKey = '';
+  /** Data URL de la textura que se está mostrando (null = color liso) */
+  private textureUrl: string | null = null;
 
   constructor(body: Body) {
     this.color = new THREE.Color(body.color);
@@ -68,6 +75,8 @@ export class BodyView {
     camera: THREE.PerspectiveCamera, viewportHeightPx: number,
   ): void {
     if (b.color !== this.colorHex) this.setColor(b.color);
+    if (b.texture !== this.textureUrl) this.setTexture(b.texture);
+    this.syncRing(b);
     const p = interpolated(b, alpha);
     this.group.position.set(p.x - focus.x, p.y - focus.y, p.z - focus.z);
     const r = visualRadius(b);
@@ -114,12 +123,59 @@ export class BodyView {
   private setColor(color: number): void {
     this.colorHex = color;
     this.color.set(color);
-    this.mesh.material.color.copy(this.color);
+    // Con textura, la esfera muestra la imagen tal cual (sin teñirla)
+    if (!this.textureUrl) this.mesh.material.color.copy(this.color);
     this.marker.material.color.copy(this.color);
     this.light?.color.copy(this.color);
   }
 
+  /** Pone o quita la imagen de la superficie. */
+  private setTexture(url: string | null): void {
+    this.textureUrl = url;
+    const material = this.mesh.material;
+    material.map?.dispose();
+    material.map = null;
+    material.color.copy(this.color);
+    material.needsUpdate = true;
+    if (!url) return;
+    textureLoader.load(url, (tex) => {
+      // Si mientras cargaba se cambió o quitó la imagen, se descarta
+      if (this.textureUrl !== url) {
+        tex.dispose();
+        return;
+      }
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.anisotropy = 4;
+      material.map = tex;
+      material.color.set(0xffffff);
+      material.needsUpdate = true;
+    });
+  }
+
+  /** Crea, actualiza o quita los anillos según el cuerpo. */
+  private syncRing(b: Body): void {
+    const key = b.ring ? `${b.ring.color}|${b.ring.outer}|${b.ring.tilt}` : '';
+    if (key === this.ringKey) return;
+    this.ringKey = key;
+    if (!b.ring) {
+      if (this.ring) {
+        this.mesh.remove(this.ring.mesh);
+        this.ring.dispose();
+        this.ring = null;
+      }
+      return;
+    }
+    if (this.ring) this.ring.set(b.ring);
+    else {
+      this.ring = new RingView(b.ring, b.id);
+      // Hijo de la esfera: hereda su escala (radio visual)
+      this.mesh.add(this.ring.mesh);
+    }
+  }
+
   dispose(): void {
+    this.ring?.dispose();
+    this.mesh.material.map?.dispose();
     this.mesh.geometry.dispose();
     this.mesh.material.dispose();
     this.marker.material.dispose();

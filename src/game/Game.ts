@@ -18,7 +18,7 @@ import {
 } from './placement';
 import {
   applyBodyEdit, applyStarType, deleteBody, editRanges, editValues, isMoon, previewHabitability, previewZone,
-  starTypeOf,
+  starTypeOf, canHaveRing, defaultRing,
 } from './editing';
 
 type Mode =
@@ -166,6 +166,8 @@ export class Game implements InputHandlers {
         isMoon: isMoon(body),
         hasWater: body.kind === 'rocky',
         canDelete: !star,
+        canHaveRing: canHaveRing(body),
+        defaultRing: defaultRing(body),
       },
       {
         onApply: (r) => this.applyEdit(id, r),

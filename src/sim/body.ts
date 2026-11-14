@@ -1,5 +1,15 @@
 export type BodyKind = 'star' | 'rocky' | 'gas' | 'ice';
 
+/** Anillos de un planeta (solo se dibujan; no afectan a la simulación). */
+export interface Ring {
+  /** Color 0xRRGGBB */
+  color: number;
+  /** Radio exterior, en radios del planeta */
+  outer: number;
+  /** Inclinación respecto al plano de la órbita, en grados */
+  tilt: number;
+}
+
 export interface Body {
   id: number;
   name: string;
@@ -23,6 +33,10 @@ export interface Body {
   atmosphere: number;
   /** Proporción de agua 0..1 */
   water: number;
+  /** Anillos (null si no tiene) */
+  ring: Ring | null;
+  /** Imagen de la superficie como data URL (null = color liso) */
+  texture: string | null;
 }
 
 export interface BodyInit {
@@ -37,4 +51,6 @@ export interface BodyInit {
   color?: number;
   atmosphere?: number;
   water?: number;
+  ring?: Ring | null;
+  texture?: string | null;
 }

@@ -28,6 +28,8 @@ export class World {
       color: init.color ?? 0xffffff,
       atmosphere: init.atmosphere ?? 0,
       water: init.water ?? 0,
+      ring: init.ring ?? null,
+      texture: init.texture ?? null,
     };
     this.bodies.push(body);
     this.accelValid = false;

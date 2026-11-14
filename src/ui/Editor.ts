@@ -1,5 +1,7 @@
 import type { BodyEdit, EditRanges, Range, SingleStarType } from '../game/editing';
-import { SINGLE_STAR_TYPES } from '../game/editing';
+import { RING_OUTER, RING_TILT, SINGLE_STAR_TYPES } from '../game/editing';
+import type { Ring } from '../sim/body';
+import { imageToSurface } from './imageTexture';
 import { SINGLE_STARS } from '../sim/stars';
 import { formatDistance, formatPercent, sig } from './format';
 
@@ -15,6 +17,10 @@ export interface EditorModel {
   isMoon: boolean;
   hasWater: boolean;
   canDelete: boolean;
+  /** Solo planetas: se le pueden poner anillos */
+  canHaveRing?: boolean;
+  /** Anillos que se proponen al activarlos */
+  defaultRing?: Ring;
 }
 
 export interface EditorResult {
@@ -117,6 +123,39 @@ function fractionSlider(label: string, initial: number, onInput: () => void): Fi
   return { root, value: () => current };
 }
 
+/** Deslizador lineal entre range.min y range.max. */
+function linearSlider(label: string, initial: number, range: Range, step: number, format: (v: number) => string, onInput: () => void): Field {
+  const root = el('label', 'editor-field');
+  const head = el('span', 'editor-field-head');
+  const shown = el('span', 'editor-field-value', format(initial));
+  head.append(el('span', '', label), shown);
+  const input = el('input', 'editor-range');
+  input.type = 'range';
+  input.min = String(range.min);
+  input.max = String(range.max);
+  input.step = String(step);
+  input.value = String(initial);
+  let current = initial;
+  input.oninput = () => {
+    current = Number(input.value);
+    shown.textContent = format(current);
+    onInput();
+  };
+  root.append(head, input);
+  return { root, value: () => current };
+}
+
+/** Interruptor con texto, para activar o desactivar una sección. */
+function toggle(label: string, initial: boolean, onChange: (on: boolean) => void) {
+  const root = el('label', 'editor-field editor-toggle');
+  const input = el('input', 'editor-switch');
+  input.type = 'checkbox';
+  input.checked = initial;
+  input.onchange = () => onChange(input.checked);
+  root.append(el('span', 'editor-field-head', label), input);
+  return { root, value: () => input.checked };
+}
+
 /** Ventana del editor de planetas, lunas y estrellas. Mientras está abierta, el juego está en pausa. */
 export class Editor {
   private readonly backdrop = el('div', 'editor-backdrop');
@@ -195,6 +234,84 @@ export class Editor {
       body.append(mass.root, radius.root, distance.root, atmosphere.root);
       if (model.hasWater) body.append(water.root);
       body.append(colorField);
+
+      // Superficie: imagen propia envuelta alrededor del planeta
+      let texture = v.texture;
+      const surface = el('div', 'editor-field');
+      const surfaceRow = el('div', 'editor-surface');
+      const thumb = el('span', 'editor-thumb');
+      const pick = el('button', 'hud-btn editor-small-btn', 'Elegir imagen');
+      pick.type = 'button';
+      const clear = el('button', 'hud-btn editor-small-btn', 'Quitar');
+      clear.type = 'button';
+      const fileInput = el('input', 'hidden');
+      fileInput.type = 'file';
+      fileInput.accept = 'image/*';
+      const surfaceNote = el('span', 'editor-note');
+      const renderSurface = () => {
+        thumb.style.backgroundImage = texture ? `url(${texture})` : '';
+        thumb.style.backgroundColor = texture ? '' : colorInput.value;
+        clear.hidden = !texture;
+        pick.textContent = texture ? 'Cambiar' : 'Elegir imagen';
+        surfaceNote.textContent = texture
+          ? 'La imagen cubre todo el planeta. Los mapas 2:1 encajan perfecto.'
+          : 'Usa una foto o un dibujo como superficie.';
+      };
+      pick.onclick = () => fileInput.click();
+      clear.onclick = () => {
+        texture = null;
+        renderSurface();
+      };
+      fileInput.onchange = async () => {
+        const file = fileInput.files?.[0];
+        fileInput.value = '';
+        if (!file) return;
+        pick.disabled = true;
+        pick.textContent = 'Cargando…';
+        try {
+          const s = await imageToSurface(file);
+          texture = s.dataUrl;
+          // El punto y la estela toman el color medio de la imagen
+          colorInput.value = hex(s.average);
+        } catch {
+          surfaceNote.textContent = 'No se pudo usar esa imagen. Prueba con otra.';
+          pick.disabled = false;
+          return;
+        }
+        pick.disabled = false;
+        renderSurface();
+      };
+      colorInput.addEventListener('input', renderSurface);
+      surfaceRow.append(thumb, pick, clear);
+      surface.append(el('span', 'editor-field-head', 'Superficie'), surfaceRow, surfaceNote, fileInput);
+      body.append(surface);
+      renderSurface();
+
+      // Anillos (solo planetas)
+      let ringOn = false;
+      let ringColor: HTMLInputElement | null = null;
+      let ringSize: Field | null = null;
+      let ringTilt: Field | null = null;
+      if (model.canHaveRing) {
+        const r0 = v.ring ?? model.defaultRing!;
+        ringOn = v.ring !== null;
+        const ringBox = el('div', 'editor-ring');
+        const ringSwitch = toggle('Anillos', ringOn, (on) => {
+          ringOn = on;
+          ringBox.hidden = !on;
+        });
+        const ringColorField = el('label', 'editor-field editor-color-field');
+        ringColor = el('input', 'editor-color');
+        ringColor.type = 'color';
+        ringColor.value = hex(r0.color);
+        ringColorField.append(el('span', 'editor-field-head', 'Color de los anillos'), ringColor);
+        ringSize = linearSlider('Tamaño de los anillos', r0.outer, RING_OUTER, 0.05, (x) => `${x.toFixed(1)}× el radio`, () => {});
+        ringTilt = linearSlider('Inclinación', r0.tilt, RING_TILT, 1, (x) => `${Math.round(x)}°`, () => {});
+        ringBox.append(ringColorField, ringSize.root, ringTilt.root);
+        ringBox.hidden = !ringOn;
+        body.append(ringSwitch.root, ringBox);
+      }
+
       collect = () => ({
         name: nameInput.value,
         values: {
@@ -205,6 +322,10 @@ export class Editor {
           atmosphere: atmosphere.value(),
           water: model.hasWater ? water.value() : 0,
           color: parseInt(colorInput.value.slice(1), 16),
+          texture,
+          ring: ringOn && ringColor && ringSize && ringTilt
+            ? { color: parseInt(ringColor.value.slice(1), 16), outer: ringSize.value(), tilt: ringTilt.value() }
+            : null,
         },
       });
     }
