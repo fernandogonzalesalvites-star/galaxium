@@ -42,8 +42,10 @@ export function centralMassFor(world: World, body: Body): MassPoint | null {
     if (parent) return parent;
   }
   const stars = world.stars().filter((s) => s.id !== body.id);
-  if (stars.length === 0) return null;
-  return centerOfMass(stars);
+  if (stars.length > 0) return centerOfMass(stars);
+  // Modo galaxias: cada galaxia gira alrededor de las demás
+  const others = world.bodies.filter((b) => b.kind === 'galaxy' && b.id !== body.id);
+  return others.length > 0 ? centerOfMass(others) : null;
 }
 
 export function relativeOrbit(body: MassPoint, central: MassPoint): OrbitInfo {

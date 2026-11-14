@@ -4,6 +4,7 @@ import type { Ring } from '../sim/body';
 import { imageToSurface } from './imageTexture';
 import { SURFACE_LABELS, SURFACE_STYLES, type SurfaceStyle } from '../sim/surfaces';
 import { surfacePreview } from '../render/surfaceTextures';
+import { GALAXY_SPECS, GALAXY_TYPES, type GalaxyType } from '../sim/galaxies';
 import { SINGLE_STARS } from '../sim/stars';
 import { formatDistance, formatPercent, sig } from './format';
 
@@ -29,6 +30,9 @@ export interface EditorModel {
   starRadius?: number;
   starRadiusRange?: Range;
   starColor?: number;
+  /** Solo galaxias: forma y color actuales */
+  galaxyType?: GalaxyType;
+  galaxyColor?: number;
 }
 
 export interface EditorResult {
@@ -38,6 +42,9 @@ export interface EditorResult {
   starRadius?: number;
   /** Solo estrellas: color 0xRRGGBB */
   starColor?: number;
+  /** Solo galaxias */
+  galaxyType?: GalaxyType;
+  galaxyColor?: number;
   values?: BodyEdit;
 }
 
@@ -203,7 +210,34 @@ export class Editor {
       preview.dataset.tone = p.tone;
     };
 
-    if (model.starType !== undefined) {
+    if (model.galaxyType !== undefined) {
+      // Galaxia: forma y color
+      let chosen: GalaxyType = model.galaxyType;
+      const group = el('div', 'editor-star-types');
+      const buttons: HTMLButtonElement[] = [];
+      const color = el('input', 'editor-color');
+      color.type = 'color';
+      color.value = hex(model.galaxyColor ?? 0xffffff);
+      for (const type of GALAXY_TYPES) {
+        const b = el('button', 'editor-star-type', GALAXY_SPECS[type].label);
+        b.type = 'button';
+        b.onclick = () => {
+          chosen = type;
+          buttons.forEach((x) => x.classList.toggle('active', x === b));
+          color.value = hex(GALAXY_SPECS[type].color);
+          refresh();
+        };
+        b.classList.toggle('active', type === chosen);
+        buttons.push(b);
+        group.append(b);
+      }
+      const field = el('div', 'editor-field');
+      field.append(el('span', 'editor-field-head', 'Forma'), group);
+      const colorField = el('label', 'editor-field editor-color-field');
+      colorField.append(el('span', 'editor-field-head', 'Color'), color);
+      body.append(field, colorField, el('span', 'editor-note', 'Cambiar la forma cambia también su masa y su tamaño.'));
+      collect = () => ({ name: nameInput.value, galaxyType: chosen, galaxyColor: parseInt(color.value.slice(1), 16) });
+    } else if (model.starType !== undefined) {
       let chosen = model.starType;
       const group = el('div', 'editor-star-types');
       const buttons: HTMLButtonElement[] = [];

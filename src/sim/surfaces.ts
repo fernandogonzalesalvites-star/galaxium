@@ -21,7 +21,7 @@ export function isSurfaceStyle(v: unknown): v is SurfaceStyle {
 
 /** Textura con la que nace un cuerpo según su tipo (para partidas viejas que no la guardaban). */
 export function defaultSurface(kind: BodyKind, isMoon: boolean): SurfaceStyle {
-  if (kind === 'star') return 'smooth';
+  if (kind === 'star' || kind === 'galaxy') return 'smooth';
   if (kind === 'gas') return 'bands';
   if (kind === 'ice') return 'ice';
   return isMoon ? 'craters' : 'rocky';

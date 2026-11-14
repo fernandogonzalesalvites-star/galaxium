@@ -1,6 +1,8 @@
 import type { SurfaceStyle } from './surfaces';
 
-export type BodyKind = 'star' | 'rocky' | 'gas' | 'ice';
+import type { GalaxyType } from './galaxies';
+
+export type BodyKind = 'star' | 'rocky' | 'gas' | 'ice' | 'galaxy';
 
 /** Anillos de un planeta (solo se dibujan; no afectan a la simulación). */
 export interface Ring {
@@ -45,6 +47,8 @@ export interface Body {
   pulsar: boolean;
   /** Solo «estrellas»: es un agujero negro (no da luz; se dibuja con su disco) */
   blackHole: boolean;
+  /** Solo en el modo galaxias: forma de la galaxia */
+  galaxyType: GalaxyType | null;
 }
 
 export interface BodyInit {
@@ -64,4 +68,5 @@ export interface BodyInit {
   surface?: SurfaceStyle;
   pulsar?: boolean;
   blackHole?: boolean;
+  galaxyType?: GalaxyType | null;
 }

@@ -22,12 +22,19 @@ import {
 } from './editing';
 import { restoreWorld, snapshot, type SaveData } from './save';
 import { createDemoSystem } from './demo';
+import type { Universe } from './save';
+import {
+  applyGalaxyType, checkGalaxyPlacement, createGalaxyUniverse, galaxies, GALAXY_SPECS, MAX_GALAXIES, mergeGalaxies,
+  placeGalaxy, type GalaxyCheck, type GalaxyType,
+} from '../sim/galaxies';
+import { formatLightYears } from '../ui/format';
 
 type Mode =
   | { kind: 'idle' }
   | { kind: 'choosingMoonParent'; type: PlanetType }
   | { kind: 'placing'; type: PlanetType; parentId: number | null }
   | { kind: 'placingStar'; type: SingleStarType }
+  | { kind: 'placingGalaxy'; type: GalaxyType }
   | { kind: 'editing'; id: number };
 
 const GHOST_TEMPERATE = 0x50e080;
@@ -37,7 +44,8 @@ const GHOST_WARNING = 0xffa040;
 const GHOST_BLOCKED = 0xff3030;
 const HINT_PLANET = 'Arrastra para elegir la órbita y suelta para colocar';
 const HINT_CHOOSE_PARENT = 'Toca el planeta que tendrá la luna';
-const HINT_STAR = 'Arrastra para elegir dónde orbitará la nueva estrella y suelta para colocarla';
+const HINT_GALAXY = 'Arrastra para elegir dónde irá la galaxia y suelta para colocarla';
+const HINT_STAR ='Arrastra para elegir dónde orbitará la nueva estrella y suelta para colocarla';
 const HINT_MOON ='Arrastra alrededor del planeta y suelta para colocar la luna';
 const INFO_REFRESH_MS = 250;
 /** Velocidad del fondo del menú (×10: las estrellas dan una vuelta cada ~3 s) */
@@ -77,8 +85,16 @@ export class Game implements InputHandlers {
 
   private readonly stepAndRecord = (dt: number): void => {
     this.world.step(dt);
+    if (this.universe === 'galaxies') {
+      for (const m of mergeGalaxies(this.world)) this.pendingToasts.push(`¡${m.eaten} se fusionó con ${m.into}!`);
+    }
     this.view.recordTrails(this.world);
   };
+
+  /** Modo de juego: sistema solar o galaxias */
+  universe: Universe = 'stars';
+  /** Avisos de fusiones ocurridas durante la simulación, para mostrar en el siguiente fotograma */
+  private pendingToasts: string[] = [];
 
   attach(hud: Hud, input: TouchInput): void {
     this.hud = hud;
@@ -91,13 +107,19 @@ export class Game implements InputHandlers {
 
   /** Abre una partida guardada. */
   load(data: SaveData): void {
-    this.begin(restoreWorld(data), data.systemName, data.speedIndex);
+    this.begin(restoreWorld(data), data.systemName, data.speedIndex, data.universe ?? 'stars');
+  }
+
+  /** Empieza una partida en el modo galaxias. */
+  startGalaxies(): void {
+    // Rápido por defecto: a escala de galaxias ×1000 ya es lento
+    this.begin(createGalaxyUniverse(), 'Galaxias', 5, 'galaxies');
   }
 
   /** Estado actual listo para guardar. */
   save(name: string): SaveData {
     const speedIndex = this.mode.kind === 'idle' ? this.clock.speedIndex : this.speedBeforePause;
-    return snapshot(this.world, { name, systemName: this.systemName, speedIndex });
+    return snapshot(this.world, { name, systemName: this.systemName, speedIndex, universe: this.universe });
   }
 
   /** Cierra la partida (vuelta al inicio). */
@@ -122,8 +144,11 @@ export class Game implements InputHandlers {
     this.view.showcase(w, DEMO_EXTENT);
   }
 
-  private begin(world: World, systemName: string, speedIndex: number): void {
+  private begin(world: World, systemName: string, speedIndex: number, universe: Universe = 'stars'): void {
     this.demo = false;
+    this.universe = universe;
+    this.pendingToasts = [];
+    this.hud.setUniverse(universe);
     this.exitMode();
     this.view.clear();
     this.world = world;
@@ -155,6 +180,10 @@ export class Game implements InputHandlers {
     if (this.selectedId !== null && !this.world.get(this.selectedId)) this.select(null);
     const now = performance.now();
     if (this.selectedId !== null && now - this.lastInfoUpdate > INFO_REFRESH_MS) this.refreshInfo();
+    if (this.pendingToasts.length) {
+      for (const t of this.pendingToasts) this.hud.toast(t);
+      this.pendingToasts = [];
+    }
   }
 
   setSpeed(index: number): void {
@@ -209,6 +238,63 @@ export class Game implements InputHandlers {
     this.mode = { kind: 'placingStar', type };
     this.setPlacingInput(true);
     this.setHint(HINT_STAR);
+  }
+
+  /** Empieza a colocar una galaxia (solo en el modo galaxias). */
+  requestAddGalaxy(type: GalaxyType): void {
+    if (!this.started || this.mode.kind === 'editing' || this.universe !== 'galaxies') return;
+    if (galaxies(this.world).length >= MAX_GALAXIES) {
+      this.hud.toast(`Máximo de ${MAX_GALAXIES} galaxias`);
+      return;
+    }
+    this.pause();
+    this.select(null);
+    this.view.ghost.hide();
+    this.mode = { kind: 'placingGalaxy', type };
+    this.setPlacingInput(true);
+    this.setHint(HINT_GALAXY);
+  }
+
+  private moveGalaxyGhost(x: number, y: number): { check: GalaxyCheck; pos: { x: number; z: number } } | null {
+    if (this.mode.kind !== 'placingGalaxy') return null;
+    const spec = GALAXY_SPECS[this.mode.type];
+    const gs = galaxies(this.world);
+    const simY = gs.length ? centerOfMass(gs).y : 0;
+    const pos = this.view.planePoint(x, y, simY);
+    if (!pos) return null;
+    const check = checkGalaxyPlacement(this.world, this.mode.type, pos.x, pos.z);
+    this.view.ghost.show(
+      {
+        center: check.center, radius: check.radius,
+        bodyPos: { x: pos.x, y: simY, z: pos.z }, bodyRadius: spec.radius,
+        color: !check.ok ? GHOST_BLOCKED : check.warning ? GHOST_WARNING : spec.color,
+        band: null,
+      },
+      this.view.focus,
+    );
+    this.hud.showPlacement(this.hint, check.warning, !check.ok, {
+      text: `${spec.label} · a ${formatLightYears(check.radius)} del centro`,
+      tone: 'neutral',
+    });
+    return { check, pos };
+  }
+
+  private releaseGalaxy(x: number, y: number): void {
+    if (this.mode.kind !== 'placingGalaxy') return;
+    const type = this.mode.type;
+    const result = this.moveGalaxyGhost(x, y);
+    if (!result) return;
+    if (!result.check.ok) {
+      this.hud.toast(result.check.warning ?? 'No se puede colocar aquí');
+      return;
+    }
+    const g = placeGalaxy(this.world, type, result.pos.x, result.pos.z);
+    this.world.removeNetMomentum();
+    this.world.snapRenderState();
+    for (const b of this.world.bodies) this.view.resetTrails(this.world, b.id);
+    this.exitMode();
+    this.hud.toast(`Se ha añadido ${g.name}`);
+    this.select(g.id);
   }
 
   cancelPlacement(): void {
@@ -277,6 +363,23 @@ export class Game implements InputHandlers {
     this.pause();
     this.mode = { kind: 'editing', id: body.id };
     const id = body.id;
+    if (body.kind === 'galaxy') {
+      this.hud.openEditor(
+        {
+          kindLabel: kindLabel(body), name: body.name, isMoon: false, hasWater: false,
+          canDelete: galaxies(this.world).length > 1,
+          galaxyType: body.galaxyType ?? 'spiral', galaxyColor: body.color,
+        },
+        {
+          onApply: (r) => this.applyEdit(id, r),
+          onCancel: () => this.exitMode(),
+          onDelete: () => this.deleteBody(id),
+          preview: (r) => ({ text: r.galaxyType ? `${GALAXY_SPECS[r.galaxyType].label}` : '', tone: 'neutral' }),
+          distanceRange: () => ({ min: 0, max: 0 }),
+        },
+      );
+      return;
+    }
     const star = body.kind === 'star';
     const values = star ? undefined : editValues(this.world, body);
     this.hud.openEditor(
@@ -329,7 +432,11 @@ export class Game implements InputHandlers {
   private applyEdit(id: number, r: EditorResult): void {
     const body = this.world.get(id);
     if (body) {
-      if (body.kind === 'star') {
+      if (body.kind === 'galaxy') {
+        body.name = r.name.trim() || body.name;
+        if (r.galaxyType && r.galaxyType !== body.galaxyType) applyGalaxyType(this.world, body, r.galaxyType);
+        if (r.galaxyColor !== undefined) body.color = r.galaxyColor;
+      } else if (body.kind === 'star') {
         if (r.starType) applyStarType(this.world, body, r.starType, r.name);
         else body.name = r.name.trim() || body.name;
         if (r.starRadius !== undefined && r.starColor !== undefined) {
@@ -388,7 +495,7 @@ export class Game implements InputHandlers {
       this.setHint(HINT_MOON);
       return;
     }
-    if (this.mode.kind === 'placing' || this.mode.kind === 'placingStar') return;
+    if (this.mode.kind === 'placing' || this.mode.kind === 'placingStar' || this.mode.kind === 'placingGalaxy') return;
     this.select(id);
   }
 
@@ -403,6 +510,10 @@ export class Game implements InputHandlers {
   onPlacementMove(x: number, y: number): void {
     if (this.mode.kind === 'placingStar') {
       this.moveStarGhost(x, y);
+      return;
+    }
+    if (this.mode.kind === 'placingGalaxy') {
+      this.moveGalaxyGhost(x, y);
       return;
     }
     const result = this.evaluatePlacement(x, y);
@@ -433,6 +544,10 @@ export class Game implements InputHandlers {
   onPlacementRelease(x: number, y: number): void {
     if (this.mode.kind === 'placingStar') {
       this.releaseStar(x, y);
+      return;
+    }
+    if (this.mode.kind === 'placingGalaxy') {
+      this.releaseGalaxy(x, y);
       return;
     }
     const result = this.evaluatePlacement(x, y);

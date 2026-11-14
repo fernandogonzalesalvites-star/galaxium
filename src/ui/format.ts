@@ -1,4 +1,5 @@
 import { DAYS_PER_YEAR } from '../sim/units';
+import { LY_PER_UNIT, MYR_PER_UNIT, SOLAR_MASSES_PER_UNIT } from '../sim/galaxies';
 
 const LOCALE = 'es-ES';
 
@@ -52,4 +53,38 @@ export function formatSpeed(yearsPerSecond: number): string {
   }
   const y = num(yearsPerSecond, 1);
   return `${y} ${y === '1' ? 'año' : 'años'}/s`;
+}
+
+// ── Modo galaxias (ver sim/galaxies.ts para las unidades) ──
+
+/** Cantidad grande en palabras: «1,5 mil millones», «2 billones». */
+function bigNumber(n: number): string {
+  if (n >= 1e12) return `${sig(n / 1e12)} ${n / 1e12 < 2 ? 'billón' : 'billones'}`;
+  if (n >= 1e9) return `${sig(n / 1e9)} mil millones`;
+  if (n >= 1e6) return `${sig(n / 1e6)} ${n / 1e6 < 2 ? 'millón' : 'millones'}`;
+  if (n >= 1e3) return `${sig(n / 1e3)} mil`;
+  return sig(n);
+}
+
+/** Distancia galáctica (kpc) en años luz. */
+export function formatLightYears(kpc: number): string {
+  return `${bigNumber(kpc * LY_PER_UNIT)} años luz`;
+}
+
+/** Masa de galaxia (unidades de 10 000 millones de soles). */
+export function formatGalaxyMass(units: number): string {
+  return `${bigNumber(units * SOLAR_MASSES_PER_UNIT)} de soles`;
+}
+
+/** Tiempo galáctico transcurrido: «Hace 0 años», «120 millones de años». */
+export function formatGalacticElapsed(units: number): string {
+  const myr = units * MYR_PER_UNIT;
+  if (myr < 1) return `${num(Math.floor(myr * 1000), 0)} mil años`;
+  return `${bigNumber(myr * 1e6)} de años`;
+}
+
+/** Velocidad del modo galaxias: «2,4 millones de años/s». */
+export function formatGalacticSpeed(unitsPerSecond: number): string {
+  if (unitsPerSecond <= 0) return 'En pausa';
+  return `${bigNumber(unitsPerSecond * MYR_PER_UNIT * 1e6)} de años/s`;
 }

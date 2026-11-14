@@ -51,7 +51,7 @@ export function defaultRing(body: Pick<Body, 'kind'>): Ring {
 
 /** Puede tener anillos: planetas (no estrellas ni lunas). */
 export function canHaveRing(body: Pick<Body, 'kind' | 'parentId'>): boolean {
-  return body.kind !== 'star' && body.parentId === null;
+  return body.kind !== 'star' && body.kind !== 'galaxy' && body.parentId === null;
 }
 
 export interface EditRanges {

@@ -1,7 +1,7 @@
 import { STAR_CHOICES, type StarType } from '../sim/stars';
 import { createInstallButton } from '../pwa';
 import { AUTOSAVE_ID, type SaveRecord } from '../game/saveStore';
-import { formatElapsed } from './format';
+import { formatElapsed, formatGalacticElapsed } from './format';
 
 const DELETE_CONFIRM_MS = 3000;
 
@@ -22,6 +22,11 @@ function plural(n: number, one: string, many: string): string {
 
 /** «Tipo Sol · 3 planetas · día 120 · 14 nov, 15:30» */
 function describeSave(s: SaveRecord): string {
+  const date = new Date(s.savedAt).toLocaleString('es', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  if (s.universe === 'galaxies') {
+    const n = s.bodies.filter((b) => b.kind === 'galaxy').length;
+    return [s.systemName, plural(n, 'galaxia', 'galaxias'), formatGalacticElapsed(s.time), date].join(' · ');
+  }
   let planets = 0, moons = 0;
   for (const b of s.bodies) {
     if (b.kind === 'star') continue;
@@ -31,12 +36,14 @@ function describeSave(s: SaveRecord): string {
   const parts = [s.systemName, plural(planets, 'planeta', 'planetas')];
   if (moons > 0) parts.push(plural(moons, 'luna', 'lunas'));
   parts.push(formatElapsed(s.time));
-  parts.push(new Date(s.savedAt).toLocaleString('es', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }));
+  parts.push(date);
   return parts.join(' · ');
 }
 
 export interface StartScreenHandlers {
   onNew(type: StarType): void;
+  /** Empezar en el modo galaxias */
+  onGalaxies(): void;
   onLoad(save: SaveRecord): void;
   onDelete(id: string): void;
 }
@@ -152,7 +159,18 @@ export function showStartScreen(parent: HTMLElement, saves: SaveRecord[], h: Sta
     };
     grid.append(card);
   }
-  choose.append(grid);
+  // Debajo de las estrellas: el modo galaxias, donde solo se añaden galaxias
+  const galaxyCard = el('button', 'start-galaxies');
+  galaxyCard.append(
+    el('span', 'start-galaxy-icon'),
+    el('strong', '', 'Galaxias'),
+    el('span', 'start-desc', 'Otra escala: aquí solo se añaden galaxias. Se atraen, giran unas alrededor de otras y, si chocan, se fusionan.'),
+  );
+  galaxyCard.onclick = () => {
+    close();
+    h.onGalaxies();
+  };
+  choose.append(grid, galaxyCard);
   screen.append(header, menu, choose);
   parent.append(screen);
 }

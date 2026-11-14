@@ -8,6 +8,8 @@ import { markerTexture } from './markerTexture';
 import { RingView } from './RingView';
 import { PulsarBeams } from './PulsarBeams';
 import { BlackHoleView } from './BlackHoleView';
+import { GalaxyView } from './GalaxyView';
+import type { GalaxyType } from '../sim/galaxies';
 
 /** Intensidad de la luz de una estrella y del brillo del disco de un agujero negro */
 const STAR_LIGHT = 3;
@@ -46,6 +48,8 @@ export class BodyView {
   private ring: RingView | null = null;
   private beams: PulsarBeams | null = null;
   private blackHole: BlackHoleView | null = null;
+  private galaxy: GalaxyView | null = null;
+  private galaxyType: GalaxyType | null = null;
   private ringKey = '';
   /** Data URL de la textura que se está mostrando (null = color liso) */
   private textureUrl: string | null = null;
@@ -99,6 +103,7 @@ export class BodyView {
     this.screenRadiusPx = (r / (dist * Math.tan(halfFov))) * (viewportHeightPx / 2);
     this.syncBeams(b, dist);
     this.syncBlackHole(b, dist);
+    this.syncGalaxy(b, time);
     // El agujero negro siempre se ve por su disco: el punto marcador lo taparía
     this.marker.visible = !this.blackHole && this.screenRadiusPx < MARKER_HIDE_PX;
     this.updateTrail(p, alpha, focus, center, time);
@@ -145,6 +150,7 @@ export class BodyView {
     this.light?.color.copy(this.color);
     this.beams?.setColor(this.color);
     this.blackHole?.setColor(this.color);
+    this.galaxy?.setColor(this.color);
   }
 
   /** Pone o quita la imagen de la superficie. */
@@ -186,6 +192,25 @@ export class BodyView {
     } else {
       void surfaceTexture(b.surface, b.id).then((tex) => apply(tex, false, true));
     }
+  }
+
+  /** Galaxia: nube de puntos en lugar de esfera (se rehace si cambia de forma). */
+  private syncGalaxy(b: Body, time: number): void {
+    const type = b.kind === 'galaxy' ? b.galaxyType ?? 'spiral' : null;
+    if (type !== this.galaxyType) {
+      if (this.galaxy) {
+        this.group.remove(this.galaxy.group);
+        this.galaxy.dispose();
+        this.galaxy = null;
+      }
+      this.galaxyType = type;
+      if (type) {
+        this.galaxy = new GalaxyView(type, b.id, this.color);
+        this.group.add(this.galaxy.group);
+      }
+      this.mesh.visible = !type && !this.blackHole;
+    }
+    this.galaxy?.update(b.radius, time);
   }
 
   /** Pone o quita el dibujo de agujero negro (horizonte, disco y anillo de luz). */
@@ -244,6 +269,7 @@ export class BodyView {
     this.ring?.dispose();
     this.beams?.dispose();
     this.blackHole?.dispose();
+    this.galaxy?.dispose();
     // Las texturas incluidas son compartidas: solo se libera una imagen propia
     if (this.ownsMap) this.mesh.material.map?.dispose();
     this.mesh.geometry.dispose();

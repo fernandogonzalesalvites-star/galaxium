@@ -7,6 +7,8 @@ export class World {
   bodies: Body[] = [];
   /** Tiempo simulado en años */
   time = 0;
+  /** Suavizado gravitatorio (unidades²): mínimo para estrellas, grande para galaxias */
+  softening2 = SOFTENING2;
   private nextId = 1;
   private accelValid = false;
 
@@ -34,6 +36,7 @@ export class World {
       surface: init.surface ?? defaultSurface(init.kind, (init.parentId ?? null) !== null),
       pulsar: init.pulsar ?? false,
       blackHole: init.blackHole ?? false,
+      galaxyType: init.galaxyType ?? null,
     };
     this.bodies.push(body);
     this.accelValid = false;
@@ -79,7 +82,7 @@ export class World {
       for (let j = i + 1; j < n; j++) {
         const b = bs[j];
         const dx = b.x - a.x, dy = b.y - a.y, dz = b.z - a.z;
-        const r2 = dx * dx + dy * dy + dz * dz + SOFTENING2;
+        const r2 = dx * dx + dy * dy + dz * dz + this.softening2;
         const inv = 1 / (r2 * Math.sqrt(r2));
         const fa = G * b.mass * inv;
         const fb = G * a.mass * inv;
@@ -115,7 +118,7 @@ export class World {
       for (let j = i + 1; j < bs.length; j++) {
         const b = bs[j];
         const dx = b.x - a.x, dy = b.y - a.y, dz = b.z - a.z;
-        e -= (G * a.mass * b.mass) / Math.sqrt(dx * dx + dy * dy + dz * dz + SOFTENING2);
+        e -= (G * a.mass * b.mass) / Math.sqrt(dx * dx + dy * dy + dz * dz + this.softening2);
       }
     }
     return e;

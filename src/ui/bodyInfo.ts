@@ -1,6 +1,8 @@
 import type { Body } from '../sim/body';
 import type { World } from '../sim/world';
-import { centralMassFor, relativeOrbit } from '../sim/elements';
+import { centerOfMass, centralMassFor, relativeOrbit } from '../sim/elements';
+import { GALAXY_SPECS, galaxies } from '../sim/galaxies';
+import { formatGalacticElapsed, formatGalaxyMass, formatLightYears } from './format';
 import { EARTH_MASS, EARTH_RADIUS_AU, SOLAR_RADIUS_AU } from '../sim/units';
 import { evaluateHabitability, habitableZone } from '../life/habitability';
 import { formatDistance, formatPercent, formatPeriod, formatTemperature, num, sig } from './format';
@@ -15,6 +17,7 @@ export interface BodyInfo {
 }
 
 export function kindLabel(body: Body): string {
+  if (body.kind === 'galaxy') return `Galaxia ${GALAXY_SPECS[body.galaxyType ?? 'spiral'].label.toLowerCase()}`;
   if (body.blackHole) return 'Agujero negro';
   if (body.pulsar) return 'Púlsar';
   if (body.kind === 'star') return 'Estrella';
@@ -33,6 +36,20 @@ function zoneText(world: World): string {
 }
 
 export function describeBody(world: World, body: Body): BodyInfo {
+  if (body.kind === 'galaxy') {
+    const others = galaxies(world).filter((g) => g.id !== body.id);
+    const rows: [string, string][] = [
+      ['Masa', formatGalaxyMass(body.mass)],
+      ['Diámetro', formatLightYears(body.radius * 2)],
+    ];
+    if (others.length > 0) {
+      const c = centerOfMass(others);
+      rows.push(['Distancia a las demás', formatLightYears(Math.hypot(body.x - c.x, body.y - c.y, body.z - c.z))]);
+      const o = relativeOrbit(body, c);
+      rows.push(['Una vuelta', o.bound ? formatGalacticElapsed(o.period) : 'Se aleja']);
+    }
+    return { name: body.name, kindLabel: kindLabel(body), rows, status: null };
+  }
   if (body.kind === 'star') {
     return {
       name: body.name,

@@ -2,7 +2,9 @@ import { SPEED_LEVELS } from '../game/clock';
 import { SINGLE_STAR_TYPES, type SingleStarType } from '../game/editing';
 import { SINGLE_STARS } from '../sim/stars';
 import { PLANET_PRESETS, PLANET_TYPES, type PlanetType } from '../sim/planetTypes';
-import { formatElapsed, formatSpeed } from './format';
+import { formatElapsed, formatGalacticElapsed, formatGalacticSpeed, formatSpeed } from './format';
+import { GALAXY_SPECS, GALAXY_TYPES, type GalaxyType } from '../sim/galaxies';
+import type { Universe } from '../game/save';
 import type { BodyInfo } from './bodyInfo';
 import { Editor, type EditorHandlers, type EditorModel, type PreviewTone } from './Editor';
 
@@ -11,6 +13,8 @@ export interface HudHandlers {
   onAdd(type: PlanetType): void;
   /** Añadir una estrella más al sistema */
   onAddStar(type: SingleStarType): void;
+  /** Añadir una galaxia (modo galaxias) */
+  onAddGalaxy(type: GalaxyType): void;
   onCancelPlacement(): void;
   onFrameSystem(): void;
   onEdit(): void;
@@ -120,12 +124,37 @@ export class Hud {
       };
       stars.append(b);
     }
-    this.addMenu.append(planets, stars);
+    // Modo galaxias: en el menú solo hay galaxias
+    const galaxyColumn = el('div', 'hud-add-column hidden');
+    galaxyColumn.append(el('span', 'hud-add-title', 'Galaxias'));
+    for (const type of GALAXY_TYPES) {
+      const b = el('button', 'hud-btn hud-add-item', GALAXY_SPECS[type].label);
+      b.onclick = () => {
+        this.addMenu.classList.add('hidden');
+        h.onAddGalaxy(type);
+      };
+      galaxyColumn.append(b);
+    }
+    this.addMenu.append(planets, stars, galaxyColumn);
+    this.solarColumns = [planets, stars];
+    this.galaxyColumn = galaxyColumn;
 
     const bottom = el('div', 'hud-bottom');
     bottom.append(timeWrap, add);
     this.root.append(top, this.sheet, this.placement, this.addMenu, bottom, this.toasts);
     parent.append(this.root);
+  }
+
+  private solarColumns: HTMLElement[] = [];
+  private galaxyColumn: HTMLElement | null = null;
+  private universe: Universe = 'stars';
+
+  /** Cambia el menú «＋» y las unidades de tiempo según el modo de juego. */
+  setUniverse(universe: Universe): void {
+    this.universe = universe;
+    for (const c of this.solarColumns) c.classList.toggle('hidden', universe === 'galaxies');
+    this.galaxyColumn?.classList.toggle('hidden', universe !== 'galaxies');
+    this.lastTextUpdate = -Infinity;
   }
 
   setVisible(visible: boolean): void {
@@ -144,8 +173,9 @@ export class Hud {
     const now = performance.now();
     if (now - this.lastTextUpdate < TEXT_REFRESH_MS) return;
     this.lastTextUpdate = now;
-    this.elapsed.textContent = formatElapsed(years);
-    this.realSpeed.textContent = (throttled ? '⚠ ' : '') + formatSpeed(yearsPerSecond);
+    const galactic = this.universe === 'galaxies';
+    this.elapsed.textContent = galactic ? formatGalacticElapsed(years) : formatElapsed(years);
+    this.realSpeed.textContent = (throttled ? '⚠ ' : '') + (galactic ? formatGalacticSpeed(yearsPerSecond) : formatSpeed(yearsPerSecond));
     this.realSpeed.classList.toggle('throttled', throttled);
   }
 

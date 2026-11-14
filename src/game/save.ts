@@ -1,6 +1,7 @@
 import type { Body, BodyKind } from '../sim/body';
 import { World } from '../sim/world';
 import { defaultSurface, isSurfaceStyle } from '../sim/surfaces';
+import { GALAXY_SOFTENING2, isGalaxyType } from '../sim/galaxies';
 
 export const SAVE_VERSION = 1;
 
@@ -20,13 +21,22 @@ export interface SaveData {
   time: number;
   speedIndex: number;
   bodies: SavedBody[];
+  /** Modo de juego (las partidas viejas son de estrellas) */
+  universe?: Universe;
 }
 
-const KINDS: readonly BodyKind[] = ['star', 'rocky', 'gas', 'ice'];
+/** Modo de juego: sistema solar o galaxias */
+export type Universe = 'stars' | 'galaxies';
 
-export function snapshot(world: World, meta: { name: string; systemName: string; speedIndex: number; savedAt?: number }): SaveData {
+const KINDS: readonly BodyKind[] = ['star', 'rocky', 'gas', 'ice', 'galaxy'];
+
+export function snapshot(
+  world: World,
+  meta: { name: string; systemName: string; speedIndex: number; savedAt?: number; universe?: Universe },
+): SaveData {
   return {
     version: SAVE_VERSION,
+    universe: meta.universe ?? 'stars',
     name: meta.name,
     systemName: meta.systemName,
     savedAt: meta.savedAt ?? Date.now(),
@@ -42,6 +52,7 @@ export function snapshot(world: World, meta: { name: string; systemName: string;
       surface: b.surface,
       pulsar: b.pulsar,
       blackHole: b.blackHole,
+      galaxyType: b.galaxyType,
     })),
   };
 }
@@ -66,6 +77,7 @@ export function isValidSave(data: unknown): data is SaveData {
 export function restoreWorld(data: SaveData): World {
   if (!isValidSave(data)) throw new Error('La partida guardada está dañada o es de otra versión');
   const world = new World();
+  if (data.universe === 'galaxies') world.softening2 = GALAXY_SOFTENING2;
   world.load(
     data.bodies.map((b) => ({
       ...b,
@@ -74,6 +86,7 @@ export function restoreWorld(data: SaveData): World {
       // Las partidas guardadas antes de existir los púlsares no traen este dato
       pulsar: b.pulsar ?? false,
       blackHole: b.blackHole ?? false,
+      galaxyType: b.kind === 'galaxy' && isGalaxyType(b.galaxyType) ? b.galaxyType : b.kind === 'galaxy' ? 'spiral' : null,
       // Las partidas de antes de las texturas incluidas reciben la de su tipo
       surface: isSurfaceStyle(b.surface) ? b.surface : defaultSurface(b.kind, b.parentId !== null),
       ax: 0, ay: 0, az: 0,

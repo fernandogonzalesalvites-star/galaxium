@@ -21,6 +21,7 @@ const hud = new Hud(app, {
   onSpeed: (i) => game.setSpeed(i),
   onAdd: (type) => game.requestAdd(type),
   onAddStar: (type) => game.requestAddStar(type),
+  onAddGalaxy: (type) => game.requestAddGalaxy(type),
   onCancelPlacement: () => game.cancelPlacement(),
   onFrameSystem: () => game.frameSystem(),
   onEdit: () => game.editSelected(),
@@ -80,6 +81,12 @@ async function openStart(): Promise<void> {
       slotName = '';
       hud.setVisible(true);
       game.start(type);
+    },
+    onGalaxies: () => {
+      slotId = null;
+      slotName = '';
+      hud.setVisible(true);
+      game.startGalaxies();
     },
     onLoad: (save) => {
       try {

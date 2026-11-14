@@ -69,7 +69,9 @@ export class SceneView {
       else this.followId = null;
     }
     const stars = world.stars();
-    const starCenter = stars.length > 0 ? centerOfMass(stars) : null;
+    // Centro de las estelas: las estrellas, o en el modo galaxias, las galaxias
+    const anchors = stars.length > 0 ? stars : world.bodies.filter((b) => b.kind === 'galaxy');
+    const starCenter = anchors.length > 0 ? centerOfMass(anchors) : null;
     // La zona habitable se centra en las estrellas que dan luz (pesando por su
     // brillo), no en el centro de masas: un agujero negro pesa mucho pero no alumbra
     const lit = stars.filter((s) => s.luminosity > 0);
@@ -95,7 +97,7 @@ export class SceneView {
     for (const b of world.bodies) {
       const view = this.views.get(b.id)!;
       if (refresh) this.applyTrailTiming(view, world, b);
-      const center = this.trailCenter(world, b, stars.length, starCenter, alpha);
+      const center = this.trailCenter(world, b, anchors.length, starCenter, alpha);
       view.update(b, alpha, this.focus, center, world.time, this.camera, height);
     }
     this.starfield.position.copy(this.camera.position);
@@ -146,7 +148,8 @@ export class SceneView {
     if (!b) return;
     this.followId = id;
     Object.assign(this.focus, { x: b.x, y: b.y, z: b.z });
-    this.placeCamera(distance ?? visualRadius(b) * 12);
+    // Una galaxia ya es grande: basta con alejarse unas pocas veces su radio
+    this.placeCamera(distance ?? visualRadius(b) * (b.kind === 'galaxy' ? 3 : 12));
   }
 
   /**
@@ -174,13 +177,14 @@ export class SceneView {
   frameSystem(world: World): void {
     this.followId = null;
     const stars = world.stars();
-    const c = stars.length > 0 ? centerOfMass(stars) : { x: 0, y: 0, z: 0 };
+    const gs = world.bodies.filter((b) => b.kind === 'galaxy');
+    const c = stars.length > 0 ? centerOfMass(stars) : gs.length > 0 ? centerOfMass(gs) : { x: 0, y: 0, z: 0 };
     let luminosity = 0;
     for (const s of stars) luminosity += s.luminosity;
     // Como mínimo se ve hasta más allá de la zona habitable
     let extent = Math.max(0.05, 1.5 * Math.sqrt(luminosity));
     for (const b of world.bodies) {
-      extent = Math.max(extent, Math.hypot(b.x - c.x, b.y - c.y, b.z - c.z) + visualRadius(b) * 4);
+      extent = Math.max(extent, Math.hypot(b.x - c.x, b.y - c.y, b.z - c.z) + visualRadius(b) * (b.kind === 'galaxy' ? 1.2 : 4));
     }
     Object.assign(this.focus, { x: c.x, y: c.y, z: c.z });
     this.placeCamera(this.distanceToFit(extent, 2.5));
@@ -276,7 +280,8 @@ export class SceneView {
         if (!haveCenter) {
           let m = 0;
           for (const s of world.bodies) {
-            if (s.kind !== 'star') continue;
+            // Una partida tiene estrellas o galaxias, nunca las dos
+            if (s.kind !== 'star' && s.kind !== 'galaxy') continue;
             starCount++;
             m += s.mass;
             cx += s.x * s.mass; cy += s.y * s.mass; cz += s.z * s.mass;
@@ -284,7 +289,7 @@ export class SceneView {
           if (m > 0) { cx /= m; cy /= m; cz /= m; } else starCount = 0;
           haveCenter = true;
         }
-        if (starCount === 0 || (b.kind === 'star' && starCount < 2)) continue;
+        if (starCount === 0 || ((b.kind === 'star' || b.kind === 'galaxy') && starCount < 2)) continue;
         ox = cx; oy = cy; oz = cz;
       }
       view.history.maybeRecord(world.time, b.x - ox, b.y - oy, b.z - oz);
@@ -297,7 +302,7 @@ export class SceneView {
       const parent = world.get(b.parentId);
       return parent ? interpolated(parent, alpha) : null;
     }
-    if (b.kind === 'star') return starCount > 1 ? starCenter : null;
+    if (b.kind === 'star' || b.kind === 'galaxy') return starCount > 1 ? starCenter : null;
     return starCenter;
   }
 }
