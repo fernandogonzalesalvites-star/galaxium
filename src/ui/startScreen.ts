@@ -58,7 +58,9 @@ export function showStartScreen(parent: HTMLElement, saves: SaveRecord[], h: Sta
   const close = () => screen.remove();
 
   const header = el('header', 'start-header');
-  header.append(el('h1', 'start-title', 'Galaxium'));
+  const title = el('h1', 'start-title');
+  title.append(el('span', 'start-title-main', 'Galaxium'), el('span', 'start-title-sub', 'Simulator'));
+  header.append(title);
 
   // ── Menú principal ──
   const menu = el('div', 'start-menu');

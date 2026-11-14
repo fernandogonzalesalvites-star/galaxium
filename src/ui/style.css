@@ -165,10 +165,19 @@ button { font: inherit; color: inherit; }
 /* Al elegir partida o estrella se oscurece para leer mejor */
 .start-screen.choosing { background-color: rgba(3, 5, 14, 0.72); }
 .start-header { flex: none; }
+/* «GALAXIUM» grande y «SIMULATOR» debajo, arriba a la izquierda */
 .start-title {
-  display: inline-block; font-size: 32px; font-weight: 800; letter-spacing: 0.06em;
-  background: linear-gradient(90deg, #fff4d6, #9cc4ff); -webkit-background-clip: text; background-clip: text; color: transparent;
+  display: inline-flex; flex-direction: column; line-height: 0.95; text-transform: uppercase;
+  filter: drop-shadow(0 0 18px rgba(140, 170, 255, 0.35));
 }
+.start-title-main, .start-title-sub {
+  background: linear-gradient(90deg, #fff4d6, #9cc4ff 70%, #c9a8ff); -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.start-title-main { font-size: clamp(44px, 9vw, 92px); font-weight: 900; letter-spacing: 0.04em; }
+.start-title-sub { font-size: clamp(18px, 3.6vw, 36px); font-weight: 700; letter-spacing: 0.42em; margin-top: 4px; }
+/* Al elegir partida o estrella el título se encoge para dejar sitio */
+.start-screen.choosing .start-title-main { font-size: clamp(28px, 5vw, 44px); }
+.start-screen.choosing .start-title-sub { font-size: clamp(12px, 2vw, 17px); }
 .start-menu { flex: 1; display: flex; flex-direction: column; align-items: center; }
 .start-menu-center { flex: 1; display: flex; align-items: center; justify-content: center; }
 .start-play-btn {
@@ -193,7 +202,8 @@ button { font: inherit; color: inherit; }
 @media (max-height: 500px) {
   .start-card { padding: 10px 10px; gap: 4px; }
   .start-dot { width: 24px; height: 24px; }
-  .start-title { font-size: 26px; }
+  .start-title-main { font-size: 40px; }
+  .start-title-sub { font-size: 15px; }
   .start-play-btn { padding: 14px 40px; font-size: 22px; }
 }
 .start-card {
