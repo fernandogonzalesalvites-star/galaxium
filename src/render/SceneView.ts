@@ -161,13 +161,9 @@ export class SceneView {
     const c = centerOfMass(world.stars());
     Object.assign(this.focus, { x: c.x, y: c.y, z: c.z });
     const d = this.distanceToFit(extent, 2.5);
-    // La cámara mira a un punto algo por debajo de las estrellas: así quedan en
-    // la parte alta de la pantalla, sin esconderse detrás del botón «Jugar».
-    // Al girar alrededor de la vertical que pasa por las estrellas no se mueven.
-    const drop = d * 0.2;
-    this.controls.target.set(0, -drop, 0);
+    // Las estrellas en el centro de la pantalla (el título y «Jugar» van arriba a la izquierda)
+    this.controls.target.set(0, 0, 0);
     this.camera.position.set(0, 0.42, 1).setLength(d);
-    this.camera.position.y -= drop;
     this.controls.autoRotate = true;
     this.controls.autoRotateSpeed = 0.5;
     this.habitableZone.enabled = false;
