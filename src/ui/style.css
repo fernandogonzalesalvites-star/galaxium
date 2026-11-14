@@ -169,6 +169,7 @@ button { font: inherit; color: inherit; }
 }
 .start-save-delete.armed { background: rgba(200, 40, 40, 0.8); color: #fff; font-size: 13px; }
 .save-exit { color: #ffb38a; }
+.start-version { font-size: 12px; opacity: 0.45; user-select: text; }
 .install-button {
   margin-top: 8px; padding: 14px 28px; border-radius: 999px; cursor: pointer;
   border: 1px solid rgba(140, 190, 255, 0.6); background: rgba(40, 90, 190, 0.55);

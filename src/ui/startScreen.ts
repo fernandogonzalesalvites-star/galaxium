@@ -115,6 +115,11 @@ export function showStartScreen(parent: HTMLElement, saves: SaveRecord[], h: Sta
     };
     grid.append(card);
   }
-  screen.append(grid, createInstallButton());
+  const where = location.hostname.endsWith('github.io') ? '' : ` · ${location.host}`;
+  // Se muestra en la hora local de quien juega
+  const built = new Date(__BUILD_DATE__).toLocaleString('es', {
+    day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
+  });
+  screen.append(grid, createInstallButton(), el('p', 'start-version', `Versión del ${built}${where}`));
   parent.append(screen);
 }
