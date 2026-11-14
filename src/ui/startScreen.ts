@@ -74,10 +74,12 @@ export function showStartScreen(parent: HTMLElement, saves: SaveRecord[], h: Sta
   back.onclick = () => {
     choose.hidden = true;
     menu.hidden = false;
+    screen.classList.remove('choosing');
   };
   play.onclick = () => {
     menu.hidden = true;
     choose.hidden = false;
+    screen.classList.add('choosing');
     screen.scrollTop = 0;
   };
   choose.append(back);

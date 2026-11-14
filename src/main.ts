@@ -63,7 +63,6 @@ function openGameMenu(): void {
     onSaveCopy: (name) => void saveNamed(name, true),
     onExit: async () => {
       await autosave();
-      game.stop();
       void openStart();
     },
   });
@@ -71,6 +70,7 @@ function openGameMenu(): void {
 
 async function openStart(): Promise<void> {
   hud.setVisible(false);
+  game.startDemo();
   const saves = await listSaves().catch(() => [] as SaveRecord[]);
   showStartScreen(app, saves, {
     onNew: (type) => {

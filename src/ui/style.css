@@ -138,8 +138,12 @@ button { font: inherit; color: inherit; }
   position: absolute; inset: 0; display: flex; flex-direction: column; gap: 16px; overflow-y: auto;
   padding: max(20px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right))
     max(20px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
-  background: radial-gradient(ellipse at center, rgba(20, 30, 60, 0.6), rgba(0, 0, 0, 0.9));
+  /* Casi transparente en el centro: detrás gira el sistema doble del menú */
+  background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0) 35%, rgba(0, 0, 0, 0.75) 100%);
+  transition: background-color 0.3s ease;
 }
+/* Al elegir partida o estrella se oscurece para leer mejor */
+.start-screen.choosing { background-color: rgba(3, 5, 14, 0.72); }
 .start-header { flex: none; }
 .start-title {
   display: inline-block; font-size: 32px; font-weight: 800; letter-spacing: 0.06em;

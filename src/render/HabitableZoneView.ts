@@ -46,9 +46,12 @@ export class HabitableZoneView {
     this.group.visible = false;
   }
 
+  /** false = no se dibuja (por ejemplo en el fondo del menú) */
+  enabled = true;
+
   /** `center` ya está restado del foco de la cámara. */
   update(inner: number, outer: number, center: Vec3): void {
-    const valid = Number.isFinite(inner) && Number.isFinite(outer) && outer > inner && inner > 0;
+    const valid = this.enabled && Number.isFinite(inner) && Number.isFinite(outer) && outer > inner && inner > 0;
     this.group.visible = valid;
     if (!valid) return;
     this.group.position.set(center.x, center.y, center.z);

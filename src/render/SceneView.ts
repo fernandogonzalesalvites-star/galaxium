@@ -142,6 +142,27 @@ export class SceneView {
     this.placeCamera(distance ?? visualRadius(b) * 12);
   }
 
+  /**
+   * Vista de presentación del menú: centrada en las estrellas, con la cámara
+   * algo inclinada y girando despacio alrededor.
+   */
+  showcase(world: World, extent: number): void {
+    this.followId = null;
+    const c = centerOfMass(world.stars());
+    Object.assign(this.focus, { x: c.x, y: c.y, z: c.z });
+    const d = this.distanceToFit(extent, 2.5);
+    // La cámara mira a un punto algo por debajo de las estrellas: así quedan en
+    // la parte alta de la pantalla, sin esconderse detrás del botón «Jugar».
+    // Al girar alrededor de la vertical que pasa por las estrellas no se mueven.
+    const drop = d * 0.2;
+    this.controls.target.set(0, -drop, 0);
+    this.camera.position.set(0, 0.42, 1).setLength(d);
+    this.camera.position.y -= drop;
+    this.controls.autoRotate = true;
+    this.controls.autoRotateSpeed = 0.5;
+    this.habitableZone.enabled = false;
+  }
+
   /** Encuadra todo el sistema, centrado en las estrellas. */
   frameSystem(world: World): void {
     this.followId = null;
@@ -174,6 +195,8 @@ export class SceneView {
     }
     this.views.clear();
     this.followId = null;
+    this.controls.autoRotate = false;
+    this.habitableZone.enabled = true;
     this.ghost.hide();
     this.habitableZone.update(NaN, NaN, this.focus);
   }

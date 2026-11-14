@@ -21,6 +21,7 @@ import {
   starTypeOf, canHaveRing, defaultRing,
 } from './editing';
 import { restoreWorld, snapshot, type SaveData } from './save';
+import { createDemoSystem } from './demo';
 
 type Mode =
   | { kind: 'idle' }
@@ -37,6 +38,10 @@ const HINT_PLANET = 'Arrastra para elegir la órbita y suelta para colocar';
 const HINT_CHOOSE_PARENT = 'Toca el planeta que tendrá la luna';
 const HINT_MOON = 'Arrastra alrededor del planeta y suelta para colocar la luna';
 const INFO_REFRESH_MS = 250;
+/** Velocidad del fondo del menú (×10: las estrellas dan una vuelta cada ~3 s) */
+const DEMO_SPEED_INDEX = 2;
+/** Radio (UA) que se encuadra en el fondo del menú */
+const DEMO_EXTENT = 0.4;
 
 const CLIMATE_TEXT = {
   cold: 'Demasiado frío',
@@ -56,6 +61,8 @@ export class Game implements InputHandlers {
   started = false;
   /** Nombre del sistema que se muestra arriba */
   systemName = '';
+  /** Se está mostrando el fondo animado del menú */
+  private demo = false;
   private mode: Mode = { kind: 'idle' };
   private selectedId: number | null = null;
   private speedBeforePause = 1;
@@ -100,7 +107,21 @@ export class Game implements InputHandlers {
     this.world = new World();
   }
 
+  /**
+   * Fondo animado del menú: un sistema doble con un gigante con anillos y un
+   * planeta rocoso dando vueltas. No es una partida: no se guarda ni se puede tocar.
+   */
+  startDemo(): void {
+    this.stop();
+    const w = createDemoSystem();
+    this.world = w;
+    this.demo = true;
+    this.clock.setSpeed(DEMO_SPEED_INDEX);
+    this.view.showcase(w, DEMO_EXTENT);
+  }
+
   private begin(world: World, systemName: string, speedIndex: number): void {
+    this.demo = false;
     this.exitMode();
     this.view.clear();
     this.world = world;
@@ -116,6 +137,10 @@ export class Game implements InputHandlers {
 
   frame(seconds: number): void {
     if (!this.started) {
+      if (this.demo) {
+        this.clock.advance(seconds, this.stepAndRecord);
+        this.view.sync(this.world, this.clock.alpha);
+      }
       this.view.render();
       return;
     }
