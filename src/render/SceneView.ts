@@ -46,11 +46,16 @@ export class SceneView {
     this.controls.maxDistance = 3000;
     this.scene.add(new THREE.AmbientLight(0xffffff, 0.06), this.starfield, this.habitableZone.group, this.ghost.group);
     this.resize();
+    // Además de los cambios de ventana, cualquier cambio de tamaño del contenedor
+    new ResizeObserver(() => this.resize()).observe(container);
   }
 
   resize(): void {
     const w = this.container.clientWidth;
-    const h = Math.max(this.container.clientHeight, 1);
+    const h = this.container.clientHeight;
+    // Sin tamaño todavía (página cargando u oculta): una relación de aspecto 0
+    // dejaría la cámara a distancia infinita. Se espera al siguiente cambio.
+    if (w === 0 || h === 0) return;
     this.renderer.setSize(w, h, false);
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
@@ -159,6 +164,18 @@ export class SceneView {
     offset.setLength(distance);
     this.controls.target.set(0, 0, 0);
     this.camera.position.copy(offset);
+  }
+
+  /** Quita todos los cuerpos dibujados (al salir de una partida o cargar otra). */
+  clear(): void {
+    for (const view of this.views.values()) {
+      this.scene.remove(view.group, view.trail);
+      view.dispose();
+    }
+    this.views.clear();
+    this.followId = null;
+    this.ghost.hide();
+    this.habitableZone.update(NaN, NaN, this.focus);
   }
 
   private syncViews(world: World): void {

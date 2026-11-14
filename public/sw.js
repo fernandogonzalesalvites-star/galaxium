@@ -2,7 +2,7 @@
 // La página se pide primero a la red (para recibir actualizaciones) y, si no
 // hay conexión, se usa la copia guardada. Los archivos con hash de Vite y los
 // íconos se sirven desde la caché porque nunca cambian de contenido.
-const CACHE = 'galaxium-v1';
+const CACHE = 'galaxium-v2';
 const SHELL = ['./', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png'];
 
 self.addEventListener('install', (event) => {
@@ -27,7 +27,9 @@ self.addEventListener('fetch', (event) => {
 
   if (request.mode === 'navigate') {
     event.respondWith(
-      fetch(request)
+      // 'no-cache': siempre pregunta al servidor si hay versión nueva (GitHub
+      // Pages deja la página en la caché del navegador hasta 10 minutos)
+      fetch(request, { cache: 'no-cache' })
         .then((response) => {
           const copy = response.clone();
           caches.open(CACHE).then((cache) => cache.put('./', copy));

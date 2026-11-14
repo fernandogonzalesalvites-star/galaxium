@@ -36,6 +36,14 @@ export class World {
     return body;
   }
 
+  /** Reemplaza todo el contenido (al cargar una partida). Los ids se conservan. */
+  load(bodies: Body[], time: number): void {
+    this.bodies = bodies;
+    this.time = time;
+    this.nextId = bodies.reduce((m, b) => Math.max(m, b.id), 0) + 1;
+    this.accelValid = false;
+  }
+
   remove(id: number): void {
     this.bodies = this.bodies.filter((b) => b.id !== id);
     for (const b of this.bodies) if (b.parentId === id) b.parentId = null;

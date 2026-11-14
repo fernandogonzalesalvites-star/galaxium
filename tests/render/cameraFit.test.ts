@@ -10,6 +10,10 @@ describe('fitDistance', () => {
       expect(fitDistance(r, 3, a) * tan * a).toBeGreaterThanOrEqual(1.39 * r);
     }
   });
+  test('sin tamaño de pantalla: distancia finita', () => {
+    expect(fitDistance(2, 2.5, 0)).toBe(5);
+    expect(fitDistance(2, 2.5, NaN)).toBe(5);
+  });
   test('horizontal: sin cambios', () => {
     expect(fitDistance(2, 2.5, 1.78)).toBe(5);
     expect(fitDistance(2, 3, 1.78)).toBe(6);

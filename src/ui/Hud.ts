@@ -12,6 +12,8 @@ export interface HudHandlers {
   onEdit(): void;
   onFollow(): void;
   onDeselect(): void;
+  /** Botón de partida: guardar o salir al inicio */
+  onGameMenu(): void;
 }
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, className: string, text = ''): HTMLElementTagNameMap[K] {
@@ -48,7 +50,11 @@ export class Hud {
     const frameButton = el('button', 'hud-btn hud-frame', '⌖');
     frameButton.title = 'Ver todo el sistema';
     frameButton.onclick = () => h.onFrameSystem();
-    top.append(this.systemName, this.elapsed, frameButton);
+    const menuButton = el('button', 'hud-btn hud-menu', '💾');
+    menuButton.title = 'Guardar partida';
+    menuButton.setAttribute('aria-label', 'Guardar partida');
+    menuButton.onclick = () => h.onGameMenu();
+    top.append(this.systemName, this.elapsed, menuButton, frameButton);
 
     const cancel = el('button', 'hud-btn', 'Cancelar');
     cancel.onclick = () => h.onCancelPlacement();

@@ -20,6 +20,7 @@ import {
   applyBodyEdit, applyStarType, deleteBody, editRanges, editValues, isMoon, previewHabitability, previewZone,
   starTypeOf, canHaveRing, defaultRing,
 } from './editing';
+import { restoreWorld, snapshot, type SaveData } from './save';
 
 type Mode =
   | { kind: 'idle' }
@@ -53,6 +54,8 @@ export class Game implements InputHandlers {
   world = new World();
   readonly clock = new SimClock();
   started = false;
+  /** Nombre del sistema que se muestra arriba */
+  systemName = '';
   private mode: Mode = { kind: 'idle' };
   private selectedId: number | null = null;
   private speedBeforePause = 1;
@@ -74,10 +77,40 @@ export class Game implements InputHandlers {
   }
 
   start(type: StarType): void {
-    this.world = createStarSystem(type);
+    this.begin(createStarSystem(type), STAR_CHOICES.find((c) => c.type === type)!.label, 1);
+  }
+
+  /** Abre una partida guardada. */
+  load(data: SaveData): void {
+    this.begin(restoreWorld(data), data.systemName, data.speedIndex);
+  }
+
+  /** Estado actual listo para guardar. */
+  save(name: string): SaveData {
+    const speedIndex = this.mode.kind === 'idle' ? this.clock.speedIndex : this.speedBeforePause;
+    return snapshot(this.world, { name, systemName: this.systemName, speedIndex });
+  }
+
+  /** Cierra la partida (vuelta al inicio). */
+  stop(): void {
+    this.exitMode();
+    this.started = false;
+    this.select(null);
+    this.view.clear();
+    this.world = new World();
+  }
+
+  private begin(world: World, systemName: string, speedIndex: number): void {
+    this.exitMode();
+    this.view.clear();
+    this.world = world;
+    this.world.snapRenderState();
     this.started = true;
+    this.select(null);
+    this.clock.setSpeed(speedIndex);
     this.view.frameSystem(this.world);
-    this.hud.setSystemName(STAR_CHOICES.find((c) => c.type === type)!.label);
+    this.systemName = systemName;
+    this.hud.setSystemName(systemName);
     this.hud.setSpeedIndex(this.clock.speedIndex);
   }
 
@@ -205,7 +238,10 @@ export class Game implements InputHandlers {
         if (r.starType) applyStarType(this.world, body, r.starType, r.name);
         else body.name = r.name.trim() || body.name;
         const choice = STAR_CHOICES.find((c) => c.type === r.starType);
-        if (choice && this.world.stars().length === 1) this.hud.setSystemName(choice.label);
+        if (choice && this.world.stars().length === 1) {
+          this.systemName = choice.label;
+          this.hud.setSystemName(choice.label);
+        }
       } else if (r.values) {
         const clamped = applyBodyEdit(this.world, body, r.values);
         if (clamped) this.hud.toast('La distancia se ajustó al máximo permitido');
