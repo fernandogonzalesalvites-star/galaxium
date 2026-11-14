@@ -2,7 +2,7 @@ import type { Body, Ring } from '../sim/body';
 import { isSurfaceStyle, type SurfaceStyle } from '../sim/surfaces';
 import type { World } from '../sim/world';
 import { centerOfMass, centralMassFor, circularSpeed } from '../sim/elements';
-import { visualRadius } from '../sim/scale';
+import { STAR_VISUAL_SCALE, visualRadius } from '../sim/scale';
 import { EARTH_MASS, EARTH_RADIUS_AU, SOLAR_RADIUS_AU } from '../sim/units';
 import { SINGLE_STARS, type StarType } from '../sim/stars';
 import { evaluateHabitability, habitableZone, type Habitability } from '../life/habitability';
@@ -210,6 +210,39 @@ export function applyStarType(world: World, star: Body, type: SingleStarType, na
   const trimmed = name.trim();
   star.name = oldDefault && (trimmed === '' || trimmed === star.name) ? spec.name : trimmed || star.name;
   world.invalidate();
+}
+
+/** Tamaños de estrella posibles en el editor (radios solares): de un púlsar a una supergigante. */
+export const STAR_RADIUS_LIMITS: Range = { min: 0.005, max: 60 };
+/** Una estrella no puede ocupar más de esta fracción de la distancia a su vecino más cercano */
+const STAR_NEIGHBOUR_FRACTION = 0.4;
+
+/**
+ * Tamaños permitidos (radios solares) para una estrella: no puede crecer hasta
+ * tapar a sus planetas ni a la otra estrella de un sistema doble.
+ */
+export function starRadiusRange(world: World, star: Body): Range {
+  let nearest = Infinity;
+  for (const b of world.bodies) {
+    if (b === star) continue;
+    nearest = Math.min(nearest, Math.hypot(b.x - star.x, b.y - star.y, b.z - star.z) - visualRadius(b));
+  }
+  const byNeighbours = (STAR_NEIGHBOUR_FRACTION * nearest) / STAR_VISUAL_SCALE / SOLAR_RADIUS_AU;
+  return { min: STAR_RADIUS_LIMITS.min, max: Math.max(STAR_RADIUS_LIMITS.min, Math.min(STAR_RADIUS_LIMITS.max, byNeighbours)) };
+}
+
+/**
+ * Cambia el tamaño (radios solares) y el color de una estrella. Solo es su
+ * aspecto: el brillo y la zona habitable dependen del tipo de estrella.
+ * Devuelve true si hubo que reducir el tamaño para no tapar a sus vecinos.
+ */
+export function applyStarLook(world: World, star: Body, radiusSolar: number, color: number): boolean {
+  const range = starRadiusRange(world, star);
+  const r = clamp(radiusSolar, range);
+  star.radius = r * SOLAR_RADIUS_AU;
+  star.color = color;
+  world.invalidate();
+  return r < radiusSolar;
 }
 
 /** Tipo de estrella más parecido a una estrella dada (por luminosidad). */

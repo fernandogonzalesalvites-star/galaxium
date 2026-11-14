@@ -25,11 +25,19 @@ export interface EditorModel {
   defaultRing?: Ring;
   /** Semilla de las texturas incluidas (el id del cuerpo), para la vista previa */
   seed?: number;
+  /** Solo estrellas: tamaño actual (radios solares), tamaños permitidos y color */
+  starRadius?: number;
+  starRadiusRange?: Range;
+  starColor?: number;
 }
 
 export interface EditorResult {
   name: string;
   starType?: SingleStarType;
+  /** Solo estrellas: tamaño en radios solares */
+  starRadius?: number;
+  /** Solo estrellas: color 0xRRGGBB */
+  starColor?: number;
   values?: BodyEdit;
 }
 
@@ -100,6 +108,11 @@ function logSlider(label: string, initial: number, range: Range, format: (v: num
       r = next;
       current = Math.min(r.max, Math.max(r.min, current));
       input.disabled = r.max <= r.min;
+      render();
+    },
+    /** Pone un valor (ajustado al rango) sin avisar */
+    setValue(v: number) {
+      current = Math.min(r.max, Math.max(r.min, v));
       render();
     },
   };
@@ -204,6 +217,9 @@ export class Editor {
         b.onclick = () => {
           chosen = type;
           buttons.forEach((x) => x.classList.toggle('active', x === b));
+          // Al cambiar de tipo se proponen su tamaño y su color; luego se pueden ajustar
+          size.setValue(spec.radiusSolar);
+          starColor.value = hex(spec.color);
           refresh();
         };
         b.classList.toggle('active', type === chosen);
@@ -212,8 +228,25 @@ export class Editor {
       }
       const field = el('div', 'editor-field');
       field.append(el('span', 'editor-field-head', 'Tipo de estrella'), group);
-      body.append(field);
-      collect = () => ({ name: nameInput.value, starType: chosen ?? undefined });
+
+      // Tamaño y color: solo el aspecto (el brillo depende del tipo)
+      const size = logSlider(
+        'Tamaño (radio)', model.starRadius ?? 1, model.starRadiusRange ?? { min: 0.005, max: 60 },
+        (x) => `${sig(x)} R☉`, refresh,
+      );
+      const starColorField = el('label', 'editor-field editor-color-field');
+      const starColor = el('input', 'editor-color');
+      starColor.type = 'color';
+      starColor.value = hex(model.starColor ?? 0xffffff);
+      starColorField.append(el('span', 'editor-field-head', 'Color'), starColor);
+      const note = el('span', 'editor-note', 'El tamaño y el color cambian cómo se ve. El brillo y la zona habitable dependen del tipo.');
+      body.append(field, size.root, starColorField, note);
+      collect = () => ({
+        name: nameInput.value,
+        starType: chosen ?? undefined,
+        starRadius: size.value(),
+        starColor: parseInt(starColor.value.slice(1), 16),
+      });
     } else {
       const v = model.values!;
       const ranges = model.ranges!;

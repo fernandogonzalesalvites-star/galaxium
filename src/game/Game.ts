@@ -7,7 +7,7 @@ import { createStarSystem, STAR_CHOICES, type StarType } from '../sim/stars';
 import { PLANET_PRESETS, type PlanetType } from '../sim/planetTypes';
 import { centerOfMass } from '../sim/elements';
 import { visualRadius } from '../sim/scale';
-import { EARTH_MASS, EARTH_RADIUS_AU, MAX_BODIES } from '../sim/units';
+import { EARTH_MASS, EARTH_RADIUS_AU, MAX_BODIES, SOLAR_RADIUS_AU } from '../sim/units';
 import { climateOf, temperatureAt, type Habitability } from '../life/habitability';
 import { describeBody, kindLabel } from '../ui/bodyInfo';
 import { formatDistance, formatTemperature } from '../ui/format';
@@ -18,7 +18,7 @@ import {
 } from './placement';
 import {
   applyBodyEdit, applyStarType, deleteBody, editRanges, editValues, isMoon, previewHabitability, previewZone,
-  starTypeOf, canHaveRing, defaultRing,
+  starTypeOf, canHaveRing, defaultRing, applyStarLook, starRadiusRange,
 } from './editing';
 import { restoreWorld, snapshot, type SaveData } from './save';
 import { createDemoSystem } from './demo';
@@ -227,6 +227,9 @@ export class Game implements InputHandlers {
         canHaveRing: canHaveRing(body),
         defaultRing: defaultRing(body),
         seed: body.id,
+        starRadius: star ? body.radius / SOLAR_RADIUS_AU : undefined,
+        starRadiusRange: star ? starRadiusRange(this.world, body) : undefined,
+        starColor: star ? body.color : undefined,
       },
       {
         onApply: (r) => this.applyEdit(id, r),
@@ -263,6 +266,10 @@ export class Game implements InputHandlers {
       if (body.kind === 'star') {
         if (r.starType) applyStarType(this.world, body, r.starType, r.name);
         else body.name = r.name.trim() || body.name;
+        if (r.starRadius !== undefined && r.starColor !== undefined) {
+          const shrunk = applyStarLook(this.world, body, r.starRadius, r.starColor);
+          if (shrunk) this.hud.toast('La estrella se achicó para no tapar a sus vecinos');
+        }
         const choice = STAR_CHOICES.find((c) => c.type === r.starType);
         if (choice && this.world.stars().length === 1) {
           this.systemName = choice.label;
