@@ -37,6 +37,8 @@ export interface Body {
   ring: Ring | null;
   /** Imagen de la superficie como data URL (null = color liso) */
   texture: string | null;
+  /** Solo estrellas: es un púlsar (se dibuja con haces girando) */
+  pulsar: boolean;
 }
 
 export interface BodyInit {
@@ -53,4 +55,5 @@ export interface BodyInit {
   water?: number;
   ring?: Ring | null;
   texture?: string | null;
+  pulsar?: boolean;
 }

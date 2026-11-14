@@ -1,7 +1,7 @@
 import { World } from './world';
 import { G, SOLAR_RADIUS_AU } from './units';
 
-export type StarType = 'redDwarf' | 'sunLike' | 'blueGiant' | 'binary';
+export type StarType = 'redDwarf' | 'sunLike' | 'redGiant' | 'blueGiant' | 'pulsar' | 'binary';
 
 export interface StarSpec {
   name: string;
@@ -12,12 +12,19 @@ export interface StarSpec {
   /** Radio en radios solares */
   radiusSolar: number;
   color: number;
+  /** Estrella de neutrones con haces de radiación girando */
+  pulsar?: boolean;
 }
 
 export const SINGLE_STARS: Record<Exclude<StarType, 'binary'>, StarSpec> = {
   redDwarf: { name: 'Enana roja', mass: 0.3, luminosity: 0.012, radiusSolar: 0.3, color: 0xff7a45 },
   sunLike: { name: 'Sol', mass: 1, luminosity: 1, radiusSolar: 1, color: 0xfff1c4 },
+  // Una estrella como el Sol al final de su vida: hinchada, fría por fuera y muy brillante
+  redGiant: { name: 'Gigante roja', mass: 1.2, luminosity: 300, radiusSolar: 40, color: 0xff5a36 },
   blueGiant: { name: 'Gigante azul', mass: 10, luminosity: 5000, radiusSolar: 6, color: 0xa9c8ff },
+  // Estrella de neutrones: apenas da calor. Su radio real (~10 km) sería invisible;
+  // se agranda un poco para poder tocarla, y el marcador y los haces la señalan
+  pulsar: { name: 'Púlsar', mass: 1.4, luminosity: 0.1, radiusSolar: 0.005, color: 0xc8e4ff, pulsar: true },
 };
 
 export const BINARY_STAR: StarSpec & { separation: number } = {
@@ -32,7 +39,9 @@ export const BINARY_STAR: StarSpec & { separation: number } = {
 export const STAR_CHOICES: { type: StarType; label: string; description: string; color: number }[] = [
   { type: 'redDwarf', label: 'Enana roja', description: 'Pequeña y fría. Zona habitable muy cerca (~0,1 UA).', color: SINGLE_STARS.redDwarf.color },
   { type: 'sunLike', label: 'Tipo Sol', description: 'Como nuestro Sol. Zona habitable a ~1 UA.', color: SINGLE_STARS.sunLike.color },
+  { type: 'redGiant', label: 'Gigante roja', description: 'Una estrella vieja e hinchada. Zona habitable lejos (~10–20 UA).', color: SINGLE_STARS.redGiant.color },
   { type: 'blueGiant', label: 'Gigante azul', description: 'Enorme y muy brillante. Zona habitable lejana (~40–80 UA).', color: SINGLE_STARS.blueGiant.color },
+  { type: 'pulsar', label: 'Púlsar', description: 'Estrella de neutrones que gira sin parar. Da poco calor: zona habitable muy cerca (~0,2–0,4 UA).', color: SINGLE_STARS.pulsar.color },
   { type: 'binary', label: 'Sistema doble', description: 'Dos estrellas que giran juntas. Zona habitable a ~1 UA.', color: BINARY_STAR.color },
 ];
 
@@ -48,7 +57,10 @@ export function createStarSystem(type: StarType): World {
     world.add({ ...common, name: `${s.name} B`, x: -half, vz: v });
   } else {
     const s = SINGLE_STARS[type];
-    world.add({ name: s.name, kind: 'star', mass: s.mass, radius: s.radiusSolar * SOLAR_RADIUS_AU, luminosity: s.luminosity, color: s.color });
+    world.add({
+      name: s.name, kind: 'star', mass: s.mass, radius: s.radiusSolar * SOLAR_RADIUS_AU,
+      luminosity: s.luminosity, color: s.color, pulsar: s.pulsar ?? false,
+    });
   }
   return world;
 }

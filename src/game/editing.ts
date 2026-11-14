@@ -8,7 +8,7 @@ import { evaluateHabitability, habitableZone, type Habitability } from '../life/
 import { moonBandFor } from './placement';
 
 export type SingleStarType = Exclude<StarType, 'binary'>;
-export const SINGLE_STAR_TYPES: SingleStarType[] = ['redDwarf', 'sunLike', 'blueGiant'];
+export const SINGLE_STAR_TYPES: SingleStarType[] = ['redDwarf', 'sunLike', 'redGiant', 'blueGiant', 'pulsar'];
 
 export interface Range {
   min: number;
@@ -201,6 +201,7 @@ export function applyStarType(world: World, star: Body, type: SingleStarType, na
   star.luminosity = spec.luminosity;
   star.radius = spec.radiusSolar * SOLAR_RADIUS_AU;
   star.color = spec.color;
+  star.pulsar = spec.pulsar ?? false;
   const trimmed = name.trim();
   star.name = oldDefault && (trimmed === '' || trimmed === star.name) ? spec.name : trimmed || star.name;
   world.invalidate();

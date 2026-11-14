@@ -6,6 +6,7 @@ import { DT } from '../sim/units';
 import { TRAIL_LENGTH, TrailHistory } from './trail';
 import { markerTexture } from './markerTexture';
 import { RingView } from './RingView';
+import { PulsarBeams } from './PulsarBeams';
 
 const textureLoader = new THREE.TextureLoader();
 
@@ -37,6 +38,7 @@ export class BodyView {
   private readonly light: THREE.PointLight | null = null;
   private lastTrailTime = -Infinity;
   private ring: RingView | null = null;
+  private beams: PulsarBeams | null = null;
   private ringKey = '';
   /** Data URL de la textura que se está mostrando (null = color liso) */
   private textureUrl: string | null = null;
@@ -85,6 +87,7 @@ export class BodyView {
     const halfFov = THREE.MathUtils.degToRad(camera.fov / 2);
     this.screenRadiusPx = (r / (dist * Math.tan(halfFov))) * (viewportHeightPx / 2);
     this.marker.visible = this.screenRadiusPx < MARKER_HIDE_PX;
+    this.syncBeams(b, dist);
     this.updateTrail(p, alpha, focus, center, time);
   }
 
@@ -127,6 +130,7 @@ export class BodyView {
     if (!this.textureUrl) this.mesh.material.color.copy(this.color);
     this.marker.material.color.copy(this.color);
     this.light?.color.copy(this.color);
+    this.beams?.setColor(this.color);
   }
 
   /** Pone o quita la imagen de la superficie. */
@@ -152,6 +156,19 @@ export class BodyView {
     });
   }
 
+  /** Pone, gira o quita los haces si el cuerpo es (o deja de ser) un púlsar. */
+  private syncBeams(b: Body, cameraDistance: number): void {
+    if (b.pulsar && !this.beams) {
+      this.beams = new PulsarBeams(this.color);
+      this.group.add(this.beams.group);
+    } else if (!b.pulsar && this.beams) {
+      this.group.remove(this.beams.group);
+      this.beams.dispose();
+      this.beams = null;
+    }
+    this.beams?.update(cameraDistance, performance.now());
+  }
+
   /** Crea, actualiza o quita los anillos según el cuerpo. */
   private syncRing(b: Body): void {
     const key = b.ring ? `${b.ring.color}|${b.ring.outer}|${b.ring.tilt}` : '';
@@ -175,6 +192,7 @@ export class BodyView {
 
   dispose(): void {
     this.ring?.dispose();
+    this.beams?.dispose();
     this.mesh.material.map?.dispose();
     this.mesh.geometry.dispose();
     this.mesh.material.dispose();

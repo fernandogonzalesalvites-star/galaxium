@@ -59,6 +59,14 @@ describe('guardar partidas', () => {
     expect(data.bodies.find((b) => b.id === saturn.id)!.ring!.outer).toBe(2.5);
   });
 
+  it('un púlsar sigue siendo púlsar al cargar; las partidas viejas no traen púlsares', () => {
+    const w = createStarSystem('pulsar');
+    const data = JSON.parse(JSON.stringify(snapshot(w, { name: 'a', systemName: 'Púlsar', speedIndex: 1 })));
+    expect(restoreWorld(data).bodies[0].pulsar).toBe(true);
+    delete data.bodies[0].pulsar;
+    expect(restoreWorld(data).bodies[0].pulsar).toBe(false);
+  });
+
   it('rechaza datos dañados', () => {
     const { w } = game();
     const good = snapshot(w, { name: 'a', systemName: 'b', speedIndex: 1 });

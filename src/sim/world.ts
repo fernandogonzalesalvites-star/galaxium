@@ -30,6 +30,7 @@ export class World {
       water: init.water ?? 0,
       ring: init.ring ?? null,
       texture: init.texture ?? null,
+      pulsar: init.pulsar ?? false,
     };
     this.bodies.push(body);
     this.accelValid = false;

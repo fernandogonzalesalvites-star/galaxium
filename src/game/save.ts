@@ -38,6 +38,7 @@ export function snapshot(world: World, meta: { name: string; systemName: string;
       atmosphere: b.atmosphere, water: b.water,
       ring: b.ring ? { ...b.ring } : null,
       texture: b.texture,
+      pulsar: b.pulsar,
     })),
   };
 }
@@ -67,6 +68,8 @@ export function restoreWorld(data: SaveData): World {
       ...b,
       ring: b.ring ? { ...b.ring } : null,
       texture: b.texture ?? null,
+      // Las partidas guardadas antes de existir los púlsares no traen este dato
+      pulsar: b.pulsar ?? false,
       ax: 0, ay: 0, az: 0,
       px: b.x, py: b.y, pz: b.z,
     })),

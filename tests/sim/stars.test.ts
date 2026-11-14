@@ -3,6 +3,8 @@ import { createStarSystem, BINARY_STAR, STAR_CHOICES } from '../../src/sim/stars
 import { PLANET_PRESETS, PLANET_TYPES } from '../../src/sim/planetTypes';
 import { centerOfMass } from '../../src/sim/elements';
 import { DT } from '../../src/sim/units';
+import { habitableZone } from '../../src/life/habitability';
+import { visualRadius } from '../../src/sim/scale';
 
 describe('createStarSystem', () => {
   it('crea una estrella tipo Sol con 1 M☉ y 1 L☉', () => {
@@ -29,8 +31,33 @@ describe('createStarSystem', () => {
     expect(Math.abs(sep - BINARY_STAR.separation) / BINARY_STAR.separation).toBeLessThan(0.01);
   });
 
-  it('hay cuatro opciones de estrella', () => {
-    expect(STAR_CHOICES.map((c) => c.type)).toEqual(['redDwarf', 'sunLike', 'blueGiant', 'binary']);
+  it('hay seis opciones de estrella', () => {
+    expect(STAR_CHOICES.map((c) => c.type)).toEqual(['redDwarf', 'sunLike', 'redGiant', 'blueGiant', 'pulsar', 'binary']);
+  });
+
+  it('la gigante roja es enorme y brillante, con la zona habitable entre ~10 y ~20 UA', () => {
+    const s = createStarSystem('redGiant').bodies[0];
+    expect(s).toMatchObject({ name: 'Gigante roja', luminosity: 300, pulsar: false });
+    const z = habitableZone(s.luminosity);
+    expect(z.inner).toBeGreaterThan(8);
+    expect(z.outer).toBeLessThan(22);
+    // Se puede colocar un planeta en la zona habitable sin chocar con la estrella
+    expect(visualRadius(s) * 3).toBeLessThan(z.inner);
+  });
+
+  it('el púlsar es un púlsar, pesa 1,4 M☉ y su zona habitable está muy cerca', () => {
+    const s = createStarSystem('pulsar').bodies[0];
+    expect(s).toMatchObject({ name: 'Púlsar', mass: 1.4, pulsar: true });
+    const z = habitableZone(s.luminosity);
+    expect(z.inner).toBeGreaterThan(0.1);
+    expect(z.outer).toBeLessThan(0.45);
+    expect(visualRadius(s) * 3).toBeLessThan(z.inner);
+  });
+
+  it('las demás estrellas no son púlsares', () => {
+    for (const t of ['redDwarf', 'sunLike', 'blueGiant', 'binary'] as const) {
+      expect(createStarSystem(t).bodies.every((b) => !b.pulsar)).toBe(true);
+    }
   });
 });
 
