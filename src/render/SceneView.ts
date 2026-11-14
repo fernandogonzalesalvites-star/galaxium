@@ -10,6 +10,8 @@ import { fitDistance } from './cameraFit';
 import { TRAIL_LENGTH } from './trail';
 import { GhostView } from './GhostView';
 import { createStarfield } from './starfield';
+import { HabitableZoneView } from './HabitableZoneView';
+import { habitableZone } from '../life/habitability';
 
 /** Radio mínimo (px) alrededor de un cuerpo que cuenta como tocarlo */
 const PICK_RADIUS_PX = 28;
@@ -22,6 +24,7 @@ export class SceneView {
   readonly camera: THREE.PerspectiveCamera;
   readonly controls: OrbitControls;
   readonly ghost = new GhostView();
+  readonly habitableZone = new HabitableZoneView();
   /** Punto de la simulación que se dibuja en el origen de la escena (evita temblores lejos del centro) */
   readonly focus: Vec3 = { x: 0, y: 0, z: 0 };
   followId: number | null = null;
@@ -41,7 +44,7 @@ export class SceneView {
     this.controls.dampingFactor = 0.08;
     this.controls.minDistance = 1e-5;
     this.controls.maxDistance = 3000;
-    this.scene.add(new THREE.AmbientLight(0xffffff, 0.06), this.starfield, this.ghost.group);
+    this.scene.add(new THREE.AmbientLight(0xffffff, 0.06), this.starfield, this.habitableZone.group, this.ghost.group);
     this.resize();
   }
 
@@ -62,6 +65,19 @@ export class SceneView {
     }
     const stars = world.stars();
     const starCenter = stars.length > 0 ? centerOfMass(stars) : null;
+    if (starCenter) {
+      let luminosity = 0;
+      for (const s of stars) luminosity += s.luminosity;
+      const zone = habitableZone(luminosity);
+      const c = interpolated(stars[0], alpha);
+      // Con una estrella se usa su posición interpolada para que el anillo no tiemble respecto a ella
+      const center = stars.length === 1 ? c : starCenter;
+      this.habitableZone.update(zone.inner, zone.outer, {
+        x: center.x - this.focus.x, y: center.y - this.focus.y, z: center.z - this.focus.z,
+      });
+    } else {
+      this.habitableZone.update(NaN, NaN, this.focus);
+    }
     const refresh = this.frameCount++ % TRAIL_REFRESH_FRAMES === 0;
     const height = this.renderer.domElement.clientHeight;
     for (const b of world.bodies) {
@@ -178,6 +194,17 @@ export class SceneView {
       if (orbit.bound) return { interval: orbit.period / TRAIL_LENGTH, period: orbit.period };
     }
     return { interval: DEFAULT_TRAIL_INTERVAL, period: DEFAULT_TRAIL_INTERVAL * TRAIL_LENGTH };
+  }
+
+  /** Borra la estela de un cuerpo y de sus lunas (tras moverlo en el editor). */
+  resetTrails(world: World, id: number): void {
+    for (const b of world.bodies) {
+      if (b.id !== id && b.parentId !== id) continue;
+      const view = this.views.get(b.id);
+      if (!view) continue;
+      view.history.reset();
+      this.applyTrailTiming(view, world, b);
+    }
   }
 
   /** Distancia de cámara para que `radius * factor` quepa según la relación de aspecto actual. */

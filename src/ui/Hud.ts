@@ -1,12 +1,17 @@
 import { SPEED_LEVELS } from '../game/clock';
 import { PLANET_PRESETS, PLANET_TYPES, type PlanetType } from '../sim/planetTypes';
 import { formatElapsed, formatSpeed } from './format';
+import type { BodyInfo } from './bodyInfo';
+import { Editor, type EditorHandlers, type EditorModel, type PreviewTone } from './Editor';
 
 export interface HudHandlers {
   onSpeed(index: number): void;
   onAdd(type: PlanetType): void;
   onCancelPlacement(): void;
   onFrameSystem(): void;
+  onEdit(): void;
+  onFollow(): void;
+  onDeselect(): void;
 }
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, className: string, text = ''): HTMLElementTagNameMap[K] {
@@ -24,7 +29,12 @@ export class Hud {
   private readonly systemName = el('span', 'hud-system');
   private readonly elapsed = el('span', 'hud-elapsed');
   private readonly realSpeed = el('span', 'hud-real-speed');
-  private readonly selected = el('div', 'hud-selected hidden');
+  private readonly sheet = el('div', 'hud-sheet hidden');
+  private readonly sheetName = el('strong', 'hud-sheet-name');
+  private readonly sheetKind = el('span', 'hud-sheet-kind');
+  private readonly sheetStatus = el('div', 'hud-sheet-status');
+  private readonly sheetRows = el('dl', 'hud-sheet-rows');
+  private readonly placementClimate = el('div', 'hud-placement-climate');
   private readonly placement = el('div', 'hud-placement hidden');
   private readonly placementHint = el('div', 'hud-placement-hint');
   private readonly placementWarning = el('div', 'hud-placement-warning');
@@ -33,7 +43,7 @@ export class Hud {
   private readonly speedButtons: HTMLButtonElement[] = [];
   private lastTextUpdate = -Infinity;
 
-  constructor(parent: HTMLElement, h: HudHandlers) {
+  constructor(private readonly parent: HTMLElement, h: HudHandlers) {
     const top = el('div', 'hud-top');
     const frameButton = el('button', 'hud-btn hud-frame', '⌖');
     frameButton.title = 'Ver todo el sistema';
@@ -42,7 +52,22 @@ export class Hud {
 
     const cancel = el('button', 'hud-btn', 'Cancelar');
     cancel.onclick = () => h.onCancelPlacement();
-    this.placement.append(this.placementHint, this.placementWarning, cancel);
+    this.placement.append(this.placementHint, this.placementClimate, this.placementWarning, cancel);
+
+    const sheetHead = el('div', 'hud-sheet-head');
+    const titles = el('div', 'hud-sheet-titles');
+    titles.append(this.sheetName, this.sheetKind);
+    const close = el('button', 'hud-btn hud-sheet-close', '✕');
+    close.title = 'Cerrar';
+    close.onclick = () => h.onDeselect();
+    sheetHead.append(titles, close);
+    const sheetActions = el('div', 'hud-sheet-actions');
+    const edit = el('button', 'hud-btn hud-sheet-edit', 'Editar');
+    edit.onclick = () => h.onEdit();
+    const follow = el('button', 'hud-btn', 'Seguir');
+    follow.onclick = () => h.onFollow();
+    sheetActions.append(edit, follow);
+    this.sheet.append(sheetHead, this.sheetStatus, this.sheetRows, sheetActions);
 
     const time = el('div', 'hud-time');
     SPEED_LEVELS.forEach((level, i) => {
@@ -68,7 +93,7 @@ export class Hud {
 
     const bottom = el('div', 'hud-bottom');
     bottom.append(timeWrap, add);
-    this.root.append(top, this.selected, this.placement, this.addMenu, bottom, this.toasts);
+    this.root.append(top, this.sheet, this.placement, this.addMenu, bottom, this.toasts);
     parent.append(this.root);
   }
 
@@ -93,15 +118,40 @@ export class Hud {
     this.realSpeed.classList.toggle('throttled', throttled);
   }
 
-  setSelected(name: string | null): void {
-    this.selected.textContent = name ?? '';
-    this.selected.classList.toggle('hidden', name === null);
+  /** Muestra la ficha del cuerpo elegido, o la oculta con null. */
+  setSelected(info: BodyInfo | null): void {
+    this.sheet.classList.toggle('hidden', info === null);
+    if (!info) return;
+    this.addMenu.classList.add('hidden');
+    this.sheetName.textContent = info.name;
+    this.sheetKind.textContent = info.kindLabel;
+    this.sheetStatus.classList.toggle('hidden', info.status === null);
+    if (info.status) {
+      this.sheetStatus.textContent = (info.status.habitable ? '🌍 ' : '') + info.status.text;
+      this.sheetStatus.dataset.tone = info.status.habitable ? 'good' : 'bad';
+    }
+    const rows = info.rows.map(([label, value]) => {
+      const row = el('div', 'hud-sheet-row');
+      row.append(el('dt', '', label), el('dd', '', value));
+      return row;
+    });
+    this.sheetRows.replaceChildren(...rows);
   }
 
-  showPlacement(hint: string, warning: string | null, blocked: boolean): void {
+  openEditor(model: EditorModel, handlers: EditorHandlers): void {
+    this.addMenu.classList.add('hidden');
+    new Editor(this.parent, model, handlers);
+  }
+
+  showPlacement(
+    hint: string, warning: string | null, blocked: boolean,
+    climate: { text: string; tone: PreviewTone } | null = null,
+  ): void {
     this.placement.classList.remove('hidden');
     this.addMenu.classList.add('hidden');
     this.placementHint.textContent = hint;
+    this.placementClimate.textContent = climate?.text ?? '';
+    this.placementClimate.dataset.tone = climate?.tone ?? 'neutral';
     this.placementWarning.textContent = warning ?? '';
     this.placementWarning.classList.toggle('blocked', blocked);
   }

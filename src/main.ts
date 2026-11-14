@@ -13,6 +13,9 @@ const hud = new Hud(app, {
   onAdd: (type) => game.requestAdd(type),
   onCancelPlacement: () => game.cancelPlacement(),
   onFrameSystem: () => game.frameSystem(),
+  onEdit: () => game.editSelected(),
+  onFollow: () => game.followSelected(),
+  onDeselect: () => game.deselect(),
 });
 const input = new TouchInput(game);
 input.attach(view.renderer.domElement);

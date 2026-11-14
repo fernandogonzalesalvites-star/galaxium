@@ -9,7 +9,7 @@ export function showStartScreen(parent: HTMLElement, onChoose: (type: StarType) 
   const screen = document.createElement('div');
   screen.className = 'start-screen';
   const title = document.createElement('h1');
-  title.textContent = 'Forja Estelar';
+  title.textContent = 'Galaxium';
   const subtitle = document.createElement('p');
   subtitle.className = 'start-subtitle';
   subtitle.textContent = 'Elige la estrella de tu sistema';

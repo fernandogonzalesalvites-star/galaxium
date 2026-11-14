@@ -81,7 +81,13 @@ export function placePlanet(world: World, preset: PlanetPreset, x: number, z: nu
 
 /** Distancias mínima y máxima (UA) a las que puede orbitar una luna de ese tipo. */
 export function moonBand(world: World, planet: Body, preset: PlanetPreset): { min: number; max: number } {
-  const moon = { kind: preset.kind, mass: presetMass(preset), radius: presetRadius(preset) };
+  return moonBandFor(world, planet, { kind: preset.kind, mass: presetMass(preset), radius: presetRadius(preset) });
+}
+
+/** Igual que moonBand, para una luna con la masa y el radio dados. */
+export function moonBandFor(
+  world: World, planet: Body, moon: Pick<Body, 'kind' | 'mass' | 'radius'>,
+): { min: number; max: number } {
   const min = 1.2 * rocheLimit(planet, moon);
   const central = centralMassFor(world, planet);
   if (!central) return { min, max: Infinity };

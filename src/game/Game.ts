@@ -1,29 +1,53 @@
 import type { SceneView } from '../render/SceneView';
 import type { Hud } from '../ui/Hud';
 import type { InputHandlers, TouchInput } from '../input/TouchInput';
+import type { EditorResult, PreviewTone } from '../ui/Editor';
 import { World } from '../sim/world';
 import { createStarSystem, STAR_CHOICES, type StarType } from '../sim/stars';
 import { PLANET_PRESETS, type PlanetType } from '../sim/planetTypes';
 import { centerOfMass } from '../sim/elements';
 import { visualRadius } from '../sim/scale';
-import { MAX_BODIES } from '../sim/units';
+import { EARTH_MASS, EARTH_RADIUS_AU, MAX_BODIES } from '../sim/units';
+import { climateOf, temperatureAt, type Habitability } from '../life/habitability';
+import { describeBody, kindLabel } from '../ui/bodyInfo';
+import { formatDistance, formatTemperature } from '../ui/format';
 import { SimClock } from './clock';
 import {
-  checkMoonPlacement, checkPlanetPlacement, moonBand, placeMoon, placePlanet, presetRadius,
+  checkMoonPlacement, checkPlanetPlacement, moonBand, moonBandFor, placeMoon, placePlanet, presetRadius,
   type PlacementCheck,
 } from './placement';
+import {
+  applyBodyEdit, applyStarType, deleteBody, editRanges, editValues, isMoon, previewHabitability, previewZone,
+  starTypeOf,
+} from './editing';
 
 type Mode =
   | { kind: 'idle' }
   | { kind: 'choosingMoonParent'; type: PlanetType }
-  | { kind: 'placing'; type: PlanetType; parentId: number | null };
+  | { kind: 'placing'; type: PlanetType; parentId: number | null }
+  | { kind: 'editing'; id: number };
 
-const GHOST_OK = 0xffffff;
+const GHOST_TEMPERATE = 0x50e080;
+const GHOST_COLD = 0x60a8ff;
+const GHOST_HOT = 0xff7040;
 const GHOST_WARNING = 0xffa040;
-const GHOST_BLOCKED = 0xff5050;
+const GHOST_BLOCKED = 0xff3030;
 const HINT_PLANET = 'Arrastra para elegir la órbita y suelta para colocar';
 const HINT_CHOOSE_PARENT = 'Toca el planeta que tendrá la luna';
 const HINT_MOON = 'Arrastra alrededor del planeta y suelta para colocar la luna';
+const INFO_REFRESH_MS = 250;
+
+const CLIMATE_TEXT = {
+  cold: 'Demasiado frío',
+  temperate: 'Zona habitable',
+  hot: 'Demasiado caliente',
+} as const;
+
+function habitabilityPreview(h: Habitability): { text: string; tone: PreviewTone } {
+  const t = formatTemperature(h.temperature);
+  if (h.habitable) return { text: `🌍 Sería habitable · ${t}`, tone: 'good' };
+  return { text: `No sería habitable: ${h.reason!.toLowerCase()} · ${t}`, tone: 'bad' };
+}
 
 export class Game implements InputHandlers {
   world = new World();
@@ -31,8 +55,9 @@ export class Game implements InputHandlers {
   started = false;
   private mode: Mode = { kind: 'idle' };
   private selectedId: number | null = null;
-  private speedBeforePlacement = 1;
+  private speedBeforePause = 1;
   private hint = '';
+  private lastInfoUpdate = -Infinity;
   private hud!: Hud;
   private input!: TouchInput;
 
@@ -68,10 +93,12 @@ export class Game implements InputHandlers {
     const speed = paused ? 0 : this.clock.throttled ? this.clock.smoothedYearsPerSecond : this.clock.requestedYearsPerSecond;
     this.hud.setTime(this.world.time, speed, !paused && this.clock.throttled);
     if (this.selectedId !== null && !this.world.get(this.selectedId)) this.select(null);
+    const now = performance.now();
+    if (this.selectedId !== null && now - this.lastInfoUpdate > INFO_REFRESH_MS) this.refreshInfo();
   }
 
   setSpeed(index: number): void {
-    if (this.mode.kind !== 'idle') this.speedBeforePlacement = index;
+    if (this.mode.kind !== 'idle') this.speedBeforePause = index;
     else this.clock.setSpeed(index);
     this.hud.setSpeedIndex(index);
   }
@@ -81,20 +108,20 @@ export class Game implements InputHandlers {
   }
 
   requestAdd(type: PlanetType): void {
-    if (!this.started) return;
+    if (!this.started || this.mode.kind === 'editing') return;
     if (this.world.bodies.length >= MAX_BODIES) {
       this.hud.toast(`Máximo de ${MAX_BODIES} cuerpos`);
       return;
     }
-    const isMoon = PLANET_PRESETS[type].isMoon;
-    if (isMoon && !this.world.bodies.some((b) => b.kind !== 'star' && b.parentId === null)) {
+    const moon = PLANET_PRESETS[type].isMoon;
+    if (moon && !this.world.bodies.some((b) => b.kind !== 'star' && b.parentId === null)) {
       this.hud.toast('Primero añade un planeta');
       return;
     }
-    this.pauseForPlacement();
+    this.pause();
     this.select(null);
     this.view.ghost.hide();
-    if (isMoon) {
+    if (moon) {
       this.mode = { kind: 'choosingMoonParent', type };
       this.setPlacingInput(false);
       this.setHint(HINT_CHOOSE_PARENT);
@@ -106,11 +133,105 @@ export class Game implements InputHandlers {
   }
 
   cancelPlacement(): void {
-    this.exitPlacement();
+    this.exitMode();
   }
 
+  // ── Ficha y editor ─────────────────────────────────────────
+
+  followSelected(): void {
+    if (this.selectedId !== null && this.mode.kind === 'idle') this.view.follow(this.selectedId, this.world);
+  }
+
+  deselect(): void {
+    if (this.mode.kind === 'idle') this.select(null);
+  }
+
+  /** Abre el editor del cuerpo elegido. La simulación queda en pausa hasta cerrarlo. */
+  editSelected(): void {
+    if (this.mode.kind !== 'idle' || this.selectedId === null) return;
+    const body = this.world.get(this.selectedId);
+    if (!body) return;
+    this.pause();
+    this.mode = { kind: 'editing', id: body.id };
+    const id = body.id;
+    const star = body.kind === 'star';
+    const values = star ? undefined : editValues(this.world, body);
+    this.hud.openEditor(
+      {
+        kindLabel: kindLabel(body),
+        name: body.name,
+        starType: star ? starTypeOf(body) : undefined,
+        values,
+        ranges: star ? undefined : editRanges(this.world, body),
+        isMoon: isMoon(body),
+        hasWater: body.kind === 'rocky',
+        canDelete: !star,
+      },
+      {
+        onApply: (r) => this.applyEdit(id, r),
+        onCancel: () => this.exitMode(),
+        onDelete: () => this.deleteBody(id),
+        preview: (r) => this.previewEdit(id, r),
+        distanceRange: (massEarth, radiusEarth) => {
+          const b = this.world.get(id)!;
+          const parent = b.parentId !== null ? this.world.get(b.parentId) : undefined;
+          if (!parent) return editRanges(this.world, b, massEarth, radiusEarth).distance;
+          return moonBandFor(this.world, parent, { kind: b.kind, mass: massEarth * EARTH_MASS, radius: radiusEarth * EARTH_RADIUS_AU });
+        },
+      },
+    );
+  }
+
+  private previewEdit(id: number, r: EditorResult): { text: string; tone: PreviewTone } {
+    const body = this.world.get(id);
+    if (!body) return { text: '', tone: 'neutral' };
+    if (body.kind === 'star') {
+      if (!r.starType) return { text: '', tone: 'neutral' };
+      const z = previewZone(this.world, body, r.starType);
+      return {
+        text: `Zona habitable: de ${formatDistance(z.inner, false)} a ${formatDistance(z.outer, false)}`,
+        tone: 'neutral',
+      };
+    }
+    return habitabilityPreview(previewHabitability(this.world, body, r.values!));
+  }
+
+  private applyEdit(id: number, r: EditorResult): void {
+    const body = this.world.get(id);
+    if (body) {
+      if (body.kind === 'star') {
+        if (r.starType) applyStarType(this.world, body, r.starType, r.name);
+        else body.name = r.name.trim() || body.name;
+        const choice = STAR_CHOICES.find((c) => c.type === r.starType);
+        if (choice && this.world.stars().length === 1) this.hud.setSystemName(choice.label);
+      } else if (r.values) {
+        const clamped = applyBodyEdit(this.world, body, r.values);
+        if (clamped) this.hud.toast('La distancia se ajustó al máximo permitido');
+      }
+      this.world.removeNetMomentum();
+      this.world.snapRenderState();
+      this.view.resetTrails(this.world, id);
+      this.hud.toast(`Cambios guardados en ${body.name}`);
+    }
+    this.exitMode();
+    this.select(id);
+  }
+
+  private deleteBody(id: number): void {
+    const body = this.world.get(id);
+    if (body) {
+      deleteBody(this.world, id);
+      this.world.snapRenderState();
+      this.hud.toast(`Se ha eliminado ${body.name}`);
+    }
+    this.exitMode();
+    this.select(null);
+  }
+
+  // ── Gestos ─────────────────────────────────────────────────
+
   onTap(x: number, y: number): void {
-    if (!this.started) return;
+    if (!this.started || this.mode.kind === 'editing') return;
     const id = this.view.pick(x, y);
     if (this.mode.kind === 'choosingMoonParent') {
       const planet = id !== null ? this.world.get(id) : undefined;
@@ -148,18 +269,24 @@ export class Game implements InputHandlers {
     const { check, pos, y: simY } = result;
     const preset = PLANET_PRESETS[this.mode.type];
     const parent = this.mode.parentId !== null ? this.world.get(this.mode.parentId) : undefined;
+    const temperature = temperatureAt(this.world.stars(), { x: pos.x, y: simY, z: pos.z }, preset.atmosphere);
+    const climate = climateOf(temperature);
+    const climateColor = climate === 'temperate' ? GHOST_TEMPERATE : climate === 'cold' ? GHOST_COLD : GHOST_HOT;
     this.view.ghost.show(
       {
         center: check.center,
         radius: check.radius,
         bodyPos: { x: pos.x, y: simY, z: pos.z },
         bodyRadius: visualRadius({ kind: preset.kind, radius: presetRadius(preset) }),
-        color: !check.ok ? GHOST_BLOCKED : check.warning ? GHOST_WARNING : GHOST_OK,
+        color: !check.ok ? GHOST_BLOCKED : check.warning ? GHOST_WARNING : climateColor,
         band: parent ? moonBand(this.world, parent, preset) : null,
       },
       this.view.focus,
     );
-    this.hud.showPlacement(this.hint, check.warning, !check.ok);
+    this.hud.showPlacement(this.hint, check.warning, !check.ok, {
+      text: `${CLIMATE_TEXT[climate]} · ${formatTemperature(temperature)}`,
+      tone: climate === 'temperate' ? 'good' : 'bad',
+    });
   }
 
   onPlacementRelease(x: number, y: number): void {
@@ -177,7 +304,7 @@ export class Game implements InputHandlers {
       : placePlanet(this.world, preset, pos.x, pos.z);
     this.world.removeNetMomentum();
     this.world.snapRenderState();
-    this.exitPlacement();
+    this.exitMode();
     this.hud.toast(`Se ha añadido ${body.name}`);
     this.select(body.id);
   }
@@ -192,7 +319,7 @@ export class Game implements InputHandlers {
     }
     const planet = this.world.get(this.mode.parentId);
     if (!planet) {
-      this.exitPlacement();
+      this.exitMode();
       return null;
     }
     const pos = this.view.planePoint(x, y, planet.y);
@@ -204,22 +331,22 @@ export class Game implements InputHandlers {
     };
   }
 
-  /** Pausa la simulación al entrar en colocación y recuerda la velocidad anterior. */
-  private pauseForPlacement(): void {
+  /** Pausa la simulación al colocar o editar y recuerda la velocidad anterior. */
+  private pause(): void {
     if (this.mode.kind !== 'idle') return;
-    this.speedBeforePlacement = this.clock.speedIndex;
+    this.speedBeforePause = this.clock.speedIndex;
     this.clock.setSpeed(0);
     this.world.snapRenderState();
   }
 
-  private exitPlacement(): void {
+  private exitMode(): void {
     if (this.mode.kind === 'idle') return;
     this.mode = { kind: 'idle' };
     this.setPlacingInput(false);
     this.view.ghost.hide();
     this.hud.hidePlacement();
-    this.clock.setSpeed(this.speedBeforePlacement);
-    this.hud.setSpeedIndex(this.speedBeforePlacement);
+    this.clock.setSpeed(this.speedBeforePause);
+    this.hud.setSpeedIndex(this.speedBeforePause);
   }
 
   private setPlacingInput(placing: boolean): void {
@@ -234,7 +361,12 @@ export class Game implements InputHandlers {
 
   private select(id: number | null): void {
     this.selectedId = id;
-    const body = id !== null ? this.world.get(id) : undefined;
-    this.hud.setSelected(body ? body.name : null);
+    this.refreshInfo();
+  }
+
+  private refreshInfo(): void {
+    this.lastInfoUpdate = performance.now();
+    const body = this.selectedId !== null ? this.world.get(this.selectedId) : undefined;
+    this.hud.setSelected(body ? describeBody(this.world, body) : null);
   }
 }

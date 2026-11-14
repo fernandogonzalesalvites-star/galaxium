@@ -1,8 +1,8 @@
-# Forja Estelar — Documento de diseño
+# Galaxium — Documento de diseño
 
 **Fecha:** 2026-11-11
 **Estado:** aprobado por secciones, pendiente de revisión final
-**Nombre:** *Forja Estelar* (provisional)
+**Nombre:** *Galaxium* (antes «Forja Estelar»; cambiado el 14 de noviembre de 2026)
 
 ## 1. Resumen
 

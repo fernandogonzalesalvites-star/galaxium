@@ -30,10 +30,13 @@ export class BodyView {
   private readonly mesh: THREE.Mesh<THREE.SphereGeometry, THREE.MeshBasicMaterial | THREE.MeshStandardMaterial>;
   private readonly marker: THREE.Sprite;
   private readonly color: THREE.Color;
+  private colorHex: number;
+  private readonly light: THREE.PointLight | null = null;
   private lastTrailTime = -Infinity;
 
   constructor(body: Body) {
     this.color = new THREE.Color(body.color);
+    this.colorHex = body.color;
     const material =
       body.kind === 'star'
         ? new THREE.MeshBasicMaterial({ color: this.color })
@@ -44,7 +47,10 @@ export class BodyView {
     );
     this.marker.scale.setScalar(MARKER_SCALE);
     this.group.add(this.mesh, this.marker);
-    if (body.kind === 'star') this.group.add(new THREE.PointLight(this.color, 3, 0, 0));
+    if (body.kind === 'star') {
+      this.light = new THREE.PointLight(this.color, 3, 0, 0);
+      this.group.add(this.light);
+    }
 
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array((TRAIL_LENGTH + 1) * 3), 3));
@@ -61,6 +67,7 @@ export class BodyView {
     b: Body, alpha: number, focus: Vec3, center: Vec3 | null, time: number,
     camera: THREE.PerspectiveCamera, viewportHeightPx: number,
   ): void {
+    if (b.color !== this.colorHex) this.setColor(b.color);
     const p = interpolated(b, alpha);
     this.group.position.set(p.x - focus.x, p.y - focus.y, p.z - focus.z);
     const r = visualRadius(b);
@@ -101,6 +108,15 @@ export class BodyView {
     pos.needsUpdate = true;
     col.needsUpdate = true;
     geometry.setDrawRange(0, n + 1);
+  }
+
+  /** Cambia el color tras editar el cuerpo. */
+  private setColor(color: number): void {
+    this.colorHex = color;
+    this.color.set(color);
+    this.mesh.material.color.copy(this.color);
+    this.marker.material.color.copy(this.color);
+    this.light?.color.copy(this.color);
   }
 
   dispose(): void {
