@@ -7,6 +7,7 @@ import { TouchInput } from './input/TouchInput';
 import { Game } from './game/Game';
 import { AUTOSAVE_ID, deleteSave, listSaves, newSaveId, putSave, requestPersistence, type SaveRecord } from './game/saveStore';
 import { setupPwa } from './pwa';
+import { watchForUpdates } from './updates';
 
 setupPwa();
 
@@ -98,6 +99,25 @@ async function openStart(): Promise<void> {
 
 void openStart();
 setInterval(() => void autosave(), AUTOSAVE_MS);
+
+// ── Actualizaciones ──────────────────────────────────────────
+watchForUpdates({
+  // En el menú se recarga sola; durante una partida se avisa
+  canReloadNow: () => !game.started && !document.querySelector('.editor-backdrop'),
+  onUpdateAvailable: () => {
+    const banner = document.createElement('button');
+    banner.className = 'update-banner';
+    banner.textContent = '✨ Hay una versión nueva · Toca para actualizar';
+    banner.onclick = async () => {
+      banner.disabled = true;
+      banner.textContent = 'Guardando y actualizando…';
+      // Se guarda antes: al volver, «Continuar» sigue donde estabas
+      await autosave();
+      location.reload();
+    };
+    app.append(banner);
+  },
+});
 
 let last = performance.now();
 function loop(now: number): void {

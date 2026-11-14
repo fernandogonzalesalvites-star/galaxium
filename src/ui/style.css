@@ -169,6 +169,13 @@ button { font: inherit; color: inherit; }
 .start-subtitle { opacity: 0.75; }
 .start-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; width: 100%; max-width: 640px; }
 @media (max-width: 520px) { .start-grid { grid-template-columns: repeat(2, 1fr); } }
+/* Celular en horizontal (pantalla baja): tarjetas más compactas */
+@media (max-height: 500px) {
+  .start-card { padding: 10px 10px; gap: 4px; }
+  .start-dot { width: 24px; height: 24px; }
+  .start-title { font-size: 26px; }
+  .start-play-btn { padding: 14px 40px; font-size: 22px; }
+}
 .start-card {
   display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 18px 12px;
   border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 16px; background: rgba(12, 16, 28, 0.75);
@@ -196,6 +203,14 @@ button { font: inherit; color: inherit; }
 }
 .start-save-delete.armed { background: rgba(200, 40, 40, 0.8); color: #fff; font-size: 13px; }
 .save-exit { color: #ffb38a; }
+.update-banner {
+  position: absolute; z-index: 40; left: 50%; transform: translateX(-50%);
+  top: max(64px, calc(env(safe-area-inset-top) + 56px));
+  max-width: calc(100% - 24px); padding: 10px 18px; border-radius: 999px; cursor: pointer;
+  font-weight: 700; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  border: 1px solid rgba(160, 200, 255, 0.7); background: rgba(40, 90, 190, 0.92);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+}
 .start-version { font-size: 12px; opacity: 0.45; user-select: text; }
 .install-button {
   margin-top: 8px; padding: 14px 28px; border-radius: 999px; cursor: pointer;
