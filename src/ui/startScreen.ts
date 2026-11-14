@@ -41,11 +41,46 @@ export interface StartScreenHandlers {
   onDelete(id: string): void;
 }
 
-/** Pantalla inicial: continuar, abrir una partida guardada o empezar una nueva. Se elimina al elegir. */
+/**
+ * Pantalla inicial. Primero el menú (título arriba a la izquierda y «Jugar» en
+ * el centro); «Jugar» lleva a continuar, abrir una partida guardada o elegir la
+ * estrella de una nueva. Se elimina al elegir.
+ */
 export function showStartScreen(parent: HTMLElement, saves: SaveRecord[], h: StartScreenHandlers): void {
   const screen = el('div', 'start-screen');
   const close = () => screen.remove();
-  screen.append(el('h1', '', 'Galaxium'));
+
+  const header = el('header', 'start-header');
+  header.append(el('h1', 'start-title', 'Galaxium'));
+
+  // ── Menú principal ──
+  const menu = el('div', 'start-menu');
+  const play = el('button', 'start-play-btn', 'Jugar');
+  const menuFooter = el('div', 'start-footer');
+  const where = location.hostname.endsWith('github.io') ? '' : ` · ${location.host}`;
+  // Se muestra en la hora local de quien juega
+  const built = new Date(__BUILD_DATE__).toLocaleString('es', {
+    day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
+  });
+  menuFooter.append(createInstallButton(), el('p', 'start-version', `Versión del ${built}${where}`));
+  const menuCenter = el('div', 'start-menu-center');
+  menuCenter.append(play);
+  menu.append(menuCenter, menuFooter);
+
+  // ── Elegir partida o estrella ──
+  const choose = el('div', 'start-choose');
+  choose.hidden = true;
+  const back = el('button', 'start-back', '← Volver');
+  back.onclick = () => {
+    choose.hidden = true;
+    menu.hidden = false;
+  };
+  play.onclick = () => {
+    menu.hidden = true;
+    choose.hidden = false;
+    screen.scrollTop = 0;
+  };
+  choose.append(back);
 
   const auto = saves.find((s) => s.id === AUTOSAVE_ID);
   const named = saves.filter((s) => s.id !== AUTOSAVE_ID);
@@ -57,7 +92,7 @@ export function showStartScreen(parent: HTMLElement, saves: SaveRecord[], h: Sta
       close();
       h.onLoad(auto);
     };
-    screen.append(cont);
+    choose.append(cont);
   }
 
   if (named.length > 0) {
@@ -98,10 +133,10 @@ export function showStartScreen(parent: HTMLElement, saves: SaveRecord[], h: Sta
       list.append(row);
     }
     section.append(list);
-    screen.append(section);
+    choose.append(section);
   }
 
-  screen.append(el('p', 'start-subtitle', saves.length > 0 ? 'Nueva partida: elige la estrella' : 'Elige la estrella de tu sistema'));
+  choose.append(el('p', 'start-subtitle', saves.length > 0 ? 'Nueva partida: elige la estrella' : 'Elige la estrella de tu sistema'));
   const grid = el('div', 'start-grid');
   for (const choice of STAR_CHOICES) {
     const card = el('button', 'start-card');
@@ -115,11 +150,7 @@ export function showStartScreen(parent: HTMLElement, saves: SaveRecord[], h: Sta
     };
     grid.append(card);
   }
-  const where = location.hostname.endsWith('github.io') ? '' : ` · ${location.host}`;
-  // Se muestra en la hora local de quien juega
-  const built = new Date(__BUILD_DATE__).toLocaleString('es', {
-    day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
-  });
-  screen.append(grid, createInstallButton(), el('p', 'start-version', `Versión del ${built}${where}`));
+  choose.append(grid);
+  screen.append(header, menu, choose);
   parent.append(screen);
 }

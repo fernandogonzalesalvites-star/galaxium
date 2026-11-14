@@ -135,11 +135,33 @@ button { font: inherit; color: inherit; }
 .hud-toast.fade { opacity: 0; }
 
 .start-screen {
-  position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 16px; padding: 24px; overflow-y: auto;
+  position: absolute; inset: 0; display: flex; flex-direction: column; gap: 16px; overflow-y: auto;
+  padding: max(20px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right))
+    max(20px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
   background: radial-gradient(ellipse at center, rgba(20, 30, 60, 0.6), rgba(0, 0, 0, 0.9));
 }
-.start-screen h1 { font-size: 36px; letter-spacing: 0.04em; }
+.start-header { flex: none; }
+.start-title {
+  display: inline-block; font-size: 32px; font-weight: 800; letter-spacing: 0.06em;
+  background: linear-gradient(90deg, #fff4d6, #9cc4ff); -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.start-menu { flex: 1; display: flex; flex-direction: column; align-items: center; }
+.start-menu-center { flex: 1; display: flex; align-items: center; justify-content: center; }
+.start-play-btn {
+  min-width: 220px; padding: 20px 48px; border-radius: 999px; cursor: pointer;
+  font-size: 26px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase;
+  border: 1px solid rgba(160, 200, 255, 0.7); background: linear-gradient(180deg, #4f8bff, #2f5fd0);
+  box-shadow: 0 0 40px rgba(80, 140, 255, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.start-play-btn:hover { box-shadow: 0 0 56px rgba(80, 140, 255, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.3); }
+.start-play-btn:active { transform: scale(0.96); }
+.start-footer { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.start-choose { display: flex; flex-direction: column; align-items: center; gap: 16px; width: 100%; max-width: 640px; margin: 0 auto; }
+.start-back {
+  align-self: flex-start; padding: 8px 14px; border-radius: 999px; cursor: pointer; font-size: 15px;
+  border: 1px solid rgba(255, 255, 255, 0.2); background: rgba(12, 16, 28, 0.75);
+}
 .start-subtitle { opacity: 0.75; }
 .start-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; width: 100%; max-width: 640px; }
 .start-card {
