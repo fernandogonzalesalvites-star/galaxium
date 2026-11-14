@@ -226,6 +226,7 @@ export class Game implements InputHandlers {
         canDelete: !star,
         canHaveRing: canHaveRing(body),
         defaultRing: defaultRing(body),
+        seed: body.id,
       },
       {
         onApply: (r) => this.applyEdit(id, r),

@@ -1,4 +1,5 @@
 import type { Body, Ring } from '../sim/body';
+import { isSurfaceStyle, type SurfaceStyle } from '../sim/surfaces';
 import type { World } from '../sim/world';
 import { centerOfMass, centralMassFor, circularSpeed } from '../sim/elements';
 import { visualRadius } from '../sim/scale';
@@ -29,8 +30,10 @@ export interface BodyEdit {
   color: number;
   /** Anillos (solo planetas; null = sin anillos) */
   ring: Ring | null;
-  /** Imagen de la superficie como data URL (null = color liso) */
+  /** Imagen de la superficie como data URL (null = usa la textura incluida) */
   texture: string | null;
+  /** Textura incluida, teñida con el color */
+  surface: SurfaceStyle;
 }
 
 /** Límites de los anillos: radio exterior (en radios del planeta) e inclinación (grados). */
@@ -88,6 +91,7 @@ export function editValues(world: World, body: Body): BodyEdit {
     color: body.color,
     ring: body.ring ? { ...body.ring } : null,
     texture: body.texture,
+    surface: body.surface,
   };
 }
 
@@ -185,6 +189,7 @@ export function applyBodyEdit(world: World, body: Body, edit: BodyEdit): boolean
     ? { color: edit.ring.color, outer: clamp(edit.ring.outer, RING_OUTER), tilt: clamp(edit.ring.tilt, RING_TILT) }
     : null;
   body.texture = edit.texture;
+  if (isSurfaceStyle(edit.surface)) body.surface = edit.surface;
   world.invalidate();
   if (Math.abs(edit.distance - before) <= before * 1e-6) return false;
   const range = editRanges(world, body).distance;

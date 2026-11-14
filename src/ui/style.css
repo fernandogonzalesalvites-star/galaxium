@@ -83,6 +83,16 @@ button { font: inherit; color: inherit; }
 .editor-color { width: 64px; height: 40px; border: none; background: none; }
 [hidden] { display: none !important; }
 .editor-surface { display: flex; align-items: center; gap: 8px; }
+.editor-surface-preview {
+  display: block; width: 100%; aspect-ratio: 2 / 1; max-height: 140px; border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.2); background-size: cover; background-position: center;
+}
+.editor-surface-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.editor-chip {
+  padding: 8px 12px; min-height: 36px; border-radius: 999px; cursor: pointer; font-size: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.18); background: rgba(255, 255, 255, 0.06);
+}
+.editor-chip.active { border-color: rgba(140, 180, 255, 0.9); background: rgba(80, 140, 255, 0.35); font-weight: 600; }
 .editor-thumb {
   width: 72px; height: 36px; flex: none; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.2);
   background-size: cover; background-position: center;

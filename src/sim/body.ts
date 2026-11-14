@@ -1,3 +1,5 @@
+import type { SurfaceStyle } from './surfaces';
+
 export type BodyKind = 'star' | 'rocky' | 'gas' | 'ice';
 
 /** Anillos de un planeta (solo se dibujan; no afectan a la simulación). */
@@ -35,8 +37,10 @@ export interface Body {
   water: number;
   /** Anillos (null si no tiene) */
   ring: Ring | null;
-  /** Imagen de la superficie como data URL (null = color liso) */
+  /** Imagen de la superficie como data URL (null = usa la textura incluida `surface`) */
   texture: string | null;
+  /** Textura incluida, teñida con `color` */
+  surface: SurfaceStyle;
   /** Solo estrellas: es un púlsar (se dibuja con haces girando) */
   pulsar: boolean;
 }
@@ -55,5 +59,6 @@ export interface BodyInit {
   water?: number;
   ring?: Ring | null;
   texture?: string | null;
+  surface?: SurfaceStyle;
   pulsar?: boolean;
 }

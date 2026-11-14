@@ -67,6 +67,17 @@ describe('guardar partidas', () => {
     expect(restoreWorld(data).bodies[0].pulsar).toBe(false);
   });
 
+  it('guarda la textura incluida; las partidas viejas reciben la de su tipo', () => {
+    const { w, saturn, moon } = game();
+    saturn.surface = 'ice';
+    const data = JSON.parse(JSON.stringify(snapshot(w, { name: 'a', systemName: 'b', speedIndex: 1 })));
+    expect(restoreWorld(data).get(saturn.id)!.surface).toBe('ice');
+    for (const b of data.bodies) delete b.surface;
+    const old = restoreWorld(data);
+    expect(old.get(saturn.id)!.surface).toBe('bands');
+    expect(old.get(moon.id)!.surface).toBe('craters');
+  });
+
   it('rechaza datos dañados', () => {
     const { w } = game();
     const good = snapshot(w, { name: 'a', systemName: 'b', speedIndex: 1 });

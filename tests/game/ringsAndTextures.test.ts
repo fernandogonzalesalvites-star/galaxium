@@ -51,6 +51,27 @@ describe('anillos', () => {
   });
 });
 
+describe('texturas incluidas', () => {
+  it('cada tipo de planeta nace con su textura', () => {
+    const { saturn, moon } = system();
+    expect(saturn.surface).toBe('storm');
+    expect(moon.surface).toBe('craters');
+  });
+
+  it('se cambia la textura y el color a la vez, sin mover el planeta', () => {
+    const { w, saturn } = system();
+    const x = saturn.x;
+    applyBodyEdit(w, saturn, { ...editValues(w, saturn), surface: 'bands', color: 0x8844aa });
+    expect(saturn).toMatchObject({ surface: 'bands', color: 0x8844aa, x });
+  });
+
+  it('ignora texturas que no existen', () => {
+    const { w, saturn } = system();
+    applyBodyEdit(w, saturn, { ...editValues(w, saturn), surface: 'nada' as never });
+    expect(saturn.surface).toBe('storm');
+  });
+});
+
 describe('texturas', () => {
   it('se guardan y se quitan', () => {
     const { w, moon } = system();

@@ -2,6 +2,8 @@ import type { BodyEdit, EditRanges, Range, SingleStarType } from '../game/editin
 import { RING_OUTER, RING_TILT, SINGLE_STAR_TYPES } from '../game/editing';
 import type { Ring } from '../sim/body';
 import { imageToSurface } from './imageTexture';
+import { SURFACE_LABELS, SURFACE_STYLES, type SurfaceStyle } from '../sim/surfaces';
+import { surfacePreview } from '../render/surfaceTextures';
 import { SINGLE_STARS } from '../sim/stars';
 import { formatDistance, formatPercent, sig } from './format';
 
@@ -21,6 +23,8 @@ export interface EditorModel {
   canHaveRing?: boolean;
   /** Anillos que se proponen al activarlos */
   defaultRing?: Ring;
+  /** Semilla de las texturas incluidas (el id del cuerpo), para la vista previa */
+  seed?: number;
 }
 
 export interface EditorResult {
@@ -233,41 +237,63 @@ export class Editor {
       colorField.append(el('span', 'editor-field-head', 'Color'), colorInput);
       body.append(mass.root, radius.root, distance.root, atmosphere.root);
       if (model.hasWater) body.append(water.root);
-      body.append(colorField);
 
-      // Superficie: imagen propia envuelta alrededor del planeta
+      // Superficie: una textura incluida (teñida con el color) o una imagen propia
       let texture = v.texture;
+      let surfaceStyle: SurfaceStyle = v.surface;
+      const seed = model.seed ?? 1;
+      const previews = new Map<SurfaceStyle, string>();
+      const previewOf = (s: SurfaceStyle) => {
+        if (!previews.has(s)) previews.set(s, surfacePreview(s, seed));
+        return previews.get(s)!;
+      };
       const surface = el('div', 'editor-field');
-      const surfaceRow = el('div', 'editor-surface');
-      const thumb = el('span', 'editor-thumb');
-      const pick = el('button', 'hud-btn editor-small-btn', 'Elegir imagen');
-      pick.type = 'button';
-      const clear = el('button', 'hud-btn editor-small-btn', 'Quitar');
-      clear.type = 'button';
+      const thumb = el('span', 'editor-surface-preview');
+      const chips = el('div', 'editor-surface-chips');
+      const chipButtons = new Map<SurfaceStyle | 'image', HTMLButtonElement>();
       const fileInput = el('input', 'hidden');
       fileInput.type = 'file';
       fileInput.accept = 'image/*';
       const surfaceNote = el('span', 'editor-note');
       const renderSurface = () => {
-        thumb.style.backgroundImage = texture ? `url(${texture})` : '';
-        thumb.style.backgroundColor = texture ? '' : colorInput.value;
-        clear.hidden = !texture;
-        pick.textContent = texture ? 'Cambiar' : 'Elegir imagen';
+        if (texture) {
+          thumb.style.backgroundImage = `url(${texture})`;
+          thumb.style.backgroundColor = '';
+          thumb.style.backgroundBlendMode = '';
+        } else {
+          // Vista previa: textura en grises multiplicada por el color, como en el juego
+          thumb.style.backgroundImage = surfaceStyle === 'smooth' ? '' : `url(${previewOf(surfaceStyle)})`;
+          thumb.style.backgroundColor = colorInput.value;
+          thumb.style.backgroundBlendMode = 'multiply';
+        }
+        for (const [k, b] of chipButtons) b.classList.toggle('active', texture ? k === 'image' : k === surfaceStyle);
         surfaceNote.textContent = texture
-          ? 'La imagen cubre todo el planeta. Los mapas 2:1 encajan perfecto.'
-          : 'Usa una foto o un dibujo como superficie.';
+          ? 'La imagen cubre todo el planeta (los mapas 2:1 encajan perfecto). Con imagen, el color solo cambia el punto y la estela.'
+          : 'El color de abajo tiñe la superficie.';
       };
-      pick.onclick = () => fileInput.click();
-      clear.onclick = () => {
-        texture = null;
-        renderSurface();
-      };
+      for (const s of SURFACE_STYLES) {
+        const b = el('button', 'editor-chip', SURFACE_LABELS[s]);
+        b.type = 'button';
+        b.onclick = () => {
+          surfaceStyle = s;
+          texture = null;
+          renderSurface();
+        };
+        chipButtons.set(s, b);
+        chips.append(b);
+      }
+      const IMAGE_LABEL = 'Imagen propia…';
+      const imageChip = el('button', 'editor-chip', IMAGE_LABEL);
+      imageChip.type = 'button';
+      imageChip.onclick = () => fileInput.click();
+      chipButtons.set('image', imageChip);
+      chips.append(imageChip);
       fileInput.onchange = async () => {
         const file = fileInput.files?.[0];
         fileInput.value = '';
         if (!file) return;
-        pick.disabled = true;
-        pick.textContent = 'Cargando…';
+        imageChip.disabled = true;
+        imageChip.textContent = 'Cargando…';
         try {
           const s = await imageToSurface(file);
           texture = s.dataUrl;
@@ -275,16 +301,17 @@ export class Editor {
           colorInput.value = hex(s.average);
         } catch {
           surfaceNote.textContent = 'No se pudo usar esa imagen. Prueba con otra.';
-          pick.disabled = false;
           return;
+        } finally {
+          imageChip.disabled = false;
+          imageChip.textContent = IMAGE_LABEL;
         }
-        pick.disabled = false;
         renderSurface();
       };
       colorInput.addEventListener('input', renderSurface);
-      surfaceRow.append(thumb, pick, clear);
-      surface.append(el('span', 'editor-field-head', 'Superficie'), surfaceRow, surfaceNote, fileInput);
-      body.append(surface);
+      surface.append(el('span', 'editor-field-head', 'Superficie'), thumb, chips, surfaceNote, fileInput);
+      // El color va justo después de la superficie: es lo que la tiñe
+      body.append(surface, colorField);
       renderSurface();
 
       // Anillos (solo planetas)
@@ -323,6 +350,7 @@ export class Editor {
           water: model.hasWater ? water.value() : 0,
           color: parseInt(colorInput.value.slice(1), 16),
           texture,
+          surface: surfaceStyle,
           ring: ringOn && ringColor && ringSize && ringTilt
             ? { color: parseInt(ringColor.value.slice(1), 16), outer: ringSize.value(), tilt: ringTilt.value() }
             : null,

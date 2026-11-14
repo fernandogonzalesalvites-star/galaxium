@@ -1,5 +1,6 @@
 import type { Body, BodyKind } from '../sim/body';
 import { World } from '../sim/world';
+import { defaultSurface, isSurfaceStyle } from '../sim/surfaces';
 
 export const SAVE_VERSION = 1;
 
@@ -38,6 +39,7 @@ export function snapshot(world: World, meta: { name: string; systemName: string;
       atmosphere: b.atmosphere, water: b.water,
       ring: b.ring ? { ...b.ring } : null,
       texture: b.texture,
+      surface: b.surface,
       pulsar: b.pulsar,
     })),
   };
@@ -70,6 +72,8 @@ export function restoreWorld(data: SaveData): World {
       texture: b.texture ?? null,
       // Las partidas guardadas antes de existir los púlsares no traen este dato
       pulsar: b.pulsar ?? false,
+      // Las partidas de antes de las texturas incluidas reciben la de su tipo
+      surface: isSurfaceStyle(b.surface) ? b.surface : defaultSurface(b.kind, b.parentId !== null),
       ax: 0, ay: 0, az: 0,
       px: b.x, py: b.y, pz: b.z,
     })),

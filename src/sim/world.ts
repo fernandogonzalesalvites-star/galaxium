@@ -1,6 +1,7 @@
 import type { Body, BodyInit } from './body';
 import type { Vec3 } from './vec';
 import { G, SOFTENING2 } from './units';
+import { defaultSurface } from './surfaces';
 
 export class World {
   bodies: Body[] = [];
@@ -30,6 +31,7 @@ export class World {
       water: init.water ?? 0,
       ring: init.ring ?? null,
       texture: init.texture ?? null,
+      surface: init.surface ?? defaultSurface(init.kind, (init.parentId ?? null) !== null),
       pulsar: init.pulsar ?? false,
     };
     this.bodies.push(body);

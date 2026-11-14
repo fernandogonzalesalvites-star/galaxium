@@ -7,6 +7,7 @@ import { TRAIL_LENGTH, TrailHistory } from './trail';
 import { markerTexture } from './markerTexture';
 import { RingView } from './RingView';
 import { PulsarBeams } from './PulsarBeams';
+import { surfaceTexture } from './surfaceTextures';
 
 const textureLoader = new THREE.TextureLoader();
 
@@ -42,6 +43,10 @@ export class BodyView {
   private ringKey = '';
   /** Data URL de la textura que se está mostrando (null = color liso) */
   private textureUrl: string | null = null;
+  /** Superficie que se está mostrando ('' = color liso) */
+  private surfaceKey = '';
+  /** La textura actual es solo de este cuerpo (imagen propia) y hay que liberarla */
+  private ownsMap = false;
 
   constructor(body: Body) {
     this.color = new THREE.Color(body.color);
@@ -77,7 +82,7 @@ export class BodyView {
     camera: THREE.PerspectiveCamera, viewportHeightPx: number,
   ): void {
     if (b.color !== this.colorHex) this.setColor(b.color);
-    if (b.texture !== this.textureUrl) this.setTexture(b.texture);
+    this.syncSurface(b);
     this.syncRing(b);
     const p = interpolated(b, alpha);
     this.group.position.set(p.x - focus.x, p.y - focus.y, p.z - focus.z);
@@ -126,7 +131,7 @@ export class BodyView {
   private setColor(color: number): void {
     this.colorHex = color;
     this.color.set(color);
-    // Con textura, la esfera muestra la imagen tal cual (sin teñirla)
+    // Con imagen propia la esfera la muestra tal cual; las texturas incluidas se tiñen
     if (!this.textureUrl) this.mesh.material.color.copy(this.color);
     this.marker.material.color.copy(this.color);
     this.light?.color.copy(this.color);
@@ -134,26 +139,44 @@ export class BodyView {
   }
 
   /** Pone o quita la imagen de la superficie. */
-  private setTexture(url: string | null): void {
-    this.textureUrl = url;
+  /**
+   * Pone la superficie: la imagen propia (sin teñir) o la textura incluida
+   * (teñida con el color). Las estrellas no llevan textura.
+   */
+  private syncSurface(b: Body): void {
+    const key = b.texture ? `img:${b.texture}` : b.kind === 'star' || b.surface === 'smooth' ? '' : `inc:${b.surface}:${b.id}`;
+    if (key === this.surfaceKey) return;
+    this.surfaceKey = key;
+    this.textureUrl = b.texture;
     const material = this.mesh.material;
-    material.map?.dispose();
+    // Las imágenes propias son solo de este cuerpo; las incluidas se comparten (caché)
+    if (this.ownsMap) material.map?.dispose();
     material.map = null;
+    this.ownsMap = false;
     material.color.copy(this.color);
     material.needsUpdate = true;
-    if (!url) return;
-    textureLoader.load(url, (tex) => {
-      // Si mientras cargaba se cambió o quitó la imagen, se descarta
-      if (this.textureUrl !== url) {
-        tex.dispose();
+    if (!key) return;
+    const apply = (tex: THREE.Texture, own: boolean, tint: boolean) => {
+      // Si mientras se preparaba se cambió la superficie, se descarta
+      if (this.surfaceKey !== key) {
+        if (own) tex.dispose();
         return;
       }
-      tex.colorSpace = THREE.SRGBColorSpace;
-      tex.anisotropy = 4;
       material.map = tex;
-      material.color.set(0xffffff);
+      this.ownsMap = own;
+      if (tint) material.color.copy(this.color);
+      else material.color.set(0xffffff);
       material.needsUpdate = true;
-    });
+    };
+    if (b.texture) {
+      textureLoader.load(b.texture, (tex) => {
+        tex.colorSpace = THREE.SRGBColorSpace;
+        tex.anisotropy = 4;
+        apply(tex, true, false);
+      });
+    } else {
+      void surfaceTexture(b.surface, b.id).then((tex) => apply(tex, false, true));
+    }
   }
 
   /** Pone, gira o quita los haces si el cuerpo es (o deja de ser) un púlsar. */
@@ -193,7 +216,8 @@ export class BodyView {
   dispose(): void {
     this.ring?.dispose();
     this.beams?.dispose();
-    this.mesh.material.map?.dispose();
+    // Las texturas incluidas son compartidas: solo se libera una imagen propia
+    if (this.ownsMap) this.mesh.material.map?.dispose();
     this.mesh.geometry.dispose();
     this.mesh.material.dispose();
     this.marker.material.dispose();

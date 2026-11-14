@@ -76,6 +76,7 @@ export function placePlanet(world: World, preset: PlanetPreset, x: number, z: nu
     color: preset.color,
     atmosphere: preset.atmosphere,
     water: preset.water,
+    surface: preset.surface,
   });
 }
 
@@ -125,5 +126,6 @@ export function placeMoon(world: World, planet: Body, preset: PlanetPreset, x: n
     color: preset.color,
     atmosphere: preset.atmosphere,
     water: preset.water,
+    surface: preset.surface,
   });
 }
