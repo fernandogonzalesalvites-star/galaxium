@@ -4,6 +4,9 @@ import { Hud } from './ui/Hud';
 import { showStartScreen } from './ui/startScreen';
 import { TouchInput } from './input/TouchInput';
 import { Game } from './game/Game';
+import { setupPwa } from './pwa';
+
+setupPwa();
 
 const app = document.getElementById('app')!;
 const view = new SceneView(app);

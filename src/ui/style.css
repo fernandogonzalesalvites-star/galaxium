@@ -134,3 +134,10 @@ button { font: inherit; color: inherit; }
 }
 .start-dot { width: 36px; height: 36px; border-radius: 50%; }
 .start-desc { font-size: 13px; opacity: 0.75; }
+.install-button {
+  margin-top: 4px; padding: 12px 22px; border-radius: 999px; cursor: pointer;
+  border: 1px solid rgba(140, 190, 255, 0.5); background: rgba(40, 80, 160, 0.35);
+  color: inherit; font: inherit; font-weight: 600;
+}
+.install-button[hidden] { display: none; }
+.install-button:active { transform: scale(0.96); }

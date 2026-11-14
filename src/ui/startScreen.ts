@@ -1,4 +1,5 @@
 import { STAR_CHOICES, type StarType } from '../sim/stars';
+import { createInstallButton } from '../pwa';
 
 function hex(color: number): string {
   return `#${color.toString(16).padStart(6, '0')}`;
@@ -34,6 +35,6 @@ export function showStartScreen(parent: HTMLElement, onChoose: (type: StarType) 
     };
     grid.append(card);
   }
-  screen.append(title, subtitle, grid);
+  screen.append(title, subtitle, grid, createInstallButton());
   parent.append(screen);
 }
