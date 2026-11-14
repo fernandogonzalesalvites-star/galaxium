@@ -15,6 +15,8 @@ export interface BodyInfo {
 }
 
 export function kindLabel(body: Body): string {
+  if (body.blackHole) return 'Agujero negro';
+  if (body.pulsar) return 'Púlsar';
   if (body.kind === 'star') return 'Estrella';
   if (body.parentId !== null) return 'Luna';
   if (body.kind === 'gas') return 'Gigante gaseoso';
@@ -25,6 +27,7 @@ export function kindLabel(body: Body): string {
 function zoneText(world: World): string {
   let luminosity = 0;
   for (const s of world.stars()) luminosity += s.luminosity;
+  if (luminosity <= 0) return 'No hay (sin luz)';
   const z = habitableZone(luminosity);
   return `${formatDistance(z.inner, false).replace(' UA', '')} – ${formatDistance(z.outer, false)}`;
 }
@@ -37,7 +40,7 @@ export function describeBody(world: World, body: Body): BodyInfo {
       rows: [
         ['Masa', `${sig(body.mass)} M☉`],
         ['Radio', `${sig(body.radius / SOLAR_RADIUS_AU)} R☉`],
-        ['Luminosidad', `${sig(body.luminosity)} L☉`],
+        ['Luminosidad', body.blackHole ? 'No emite luz' : `${sig(body.luminosity)} L☉`],
         ['Zona habitable', zoneText(world)],
       ],
       status: null,

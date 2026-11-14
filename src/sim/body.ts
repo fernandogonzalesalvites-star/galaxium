@@ -43,6 +43,8 @@ export interface Body {
   surface: SurfaceStyle;
   /** Solo estrellas: es un púlsar (se dibuja con haces girando) */
   pulsar: boolean;
+  /** Solo «estrellas»: es un agujero negro (no da luz; se dibuja con su disco) */
+  blackHole: boolean;
 }
 
 export interface BodyInit {
@@ -61,4 +63,5 @@ export interface BodyInit {
   texture?: string | null;
   surface?: SurfaceStyle;
   pulsar?: boolean;
+  blackHole?: boolean;
 }

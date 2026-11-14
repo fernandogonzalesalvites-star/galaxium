@@ -212,7 +212,8 @@ export class Editor {
         const b = el('button', 'editor-star-type');
         b.type = 'button';
         const dot = el('span', 'editor-dot');
-        dot.style.background = hex(spec.color);
+        dot.style.background = spec.blackHole ? '#000' : hex(spec.color);
+        if (spec.blackHole) dot.style.boxShadow = `0 0 0 2px ${hex(spec.color)}`;
         b.append(dot, el('span', '', spec.name));
         b.onclick = () => {
           chosen = type;

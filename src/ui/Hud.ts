@@ -109,7 +109,10 @@ export class Hud {
       const spec = SINGLE_STARS[type];
       const b = el('button', 'hud-btn hud-add-item hud-add-star');
       const dot = el('span', 'hud-add-dot');
-      dot.style.background = `#${spec.color.toString(16).padStart(6, '0')}`;
+      const c = `#${spec.color.toString(16).padStart(6, '0')}`;
+      // El agujero negro: punto negro con un aro del color de su disco
+      dot.style.background = spec.blackHole ? '#000' : c;
+      if (spec.blackHole) dot.style.boxShadow = `0 0 0 2px ${c}, 0 0 8px ${c}`;
       b.append(dot, document.createTextNode(spec.name === 'Sol' ? 'Tipo Sol' : spec.name));
       b.onclick = () => {
         this.addMenu.classList.add('hidden');

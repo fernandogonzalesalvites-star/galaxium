@@ -33,6 +33,7 @@ export class World {
       texture: init.texture ?? null,
       surface: init.surface ?? defaultSurface(init.kind, (init.parentId ?? null) !== null),
       pulsar: init.pulsar ?? false,
+      blackHole: init.blackHole ?? false,
     };
     this.bodies.push(body);
     this.accelValid = false;

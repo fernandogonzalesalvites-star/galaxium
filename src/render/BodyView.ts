@@ -7,6 +7,11 @@ import { TRAIL_LENGTH, TrailHistory } from './trail';
 import { markerTexture } from './markerTexture';
 import { RingView } from './RingView';
 import { PulsarBeams } from './PulsarBeams';
+import { BlackHoleView } from './BlackHoleView';
+
+/** Intensidad de la luz de una estrella y del brillo del disco de un agujero negro */
+const STAR_LIGHT = 3;
+const BLACK_HOLE_LIGHT = 0.4;
 import { surfaceTexture } from './surfaceTextures';
 
 const textureLoader = new THREE.TextureLoader();
@@ -40,6 +45,7 @@ export class BodyView {
   private lastTrailTime = -Infinity;
   private ring: RingView | null = null;
   private beams: PulsarBeams | null = null;
+  private blackHole: BlackHoleView | null = null;
   private ringKey = '';
   /** Data URL de la textura que se está mostrando (null = color liso) */
   private textureUrl: string | null = null;
@@ -62,7 +68,7 @@ export class BodyView {
     this.marker.scale.setScalar(MARKER_SCALE);
     this.group.add(this.mesh, this.marker);
     if (body.kind === 'star') {
-      this.light = new THREE.PointLight(this.color, 3, 0, 0);
+      this.light = new THREE.PointLight(this.color, STAR_LIGHT, 0, 0);
       this.group.add(this.light);
     }
 
@@ -91,8 +97,10 @@ export class BodyView {
     const dist = Math.max(camera.position.distanceTo(this.group.position), 1e-12);
     const halfFov = THREE.MathUtils.degToRad(camera.fov / 2);
     this.screenRadiusPx = (r / (dist * Math.tan(halfFov))) * (viewportHeightPx / 2);
-    this.marker.visible = this.screenRadiusPx < MARKER_HIDE_PX;
     this.syncBeams(b, dist);
+    this.syncBlackHole(b, dist);
+    // El agujero negro siempre se ve por su disco: el punto marcador lo taparía
+    this.marker.visible = !this.blackHole && this.screenRadiusPx < MARKER_HIDE_PX;
     this.updateTrail(p, alpha, focus, center, time);
   }
 
@@ -136,6 +144,7 @@ export class BodyView {
     this.marker.material.color.copy(this.color);
     this.light?.color.copy(this.color);
     this.beams?.setColor(this.color);
+    this.blackHole?.setColor(this.color);
   }
 
   /** Pone o quita la imagen de la superficie. */
@@ -179,6 +188,24 @@ export class BodyView {
     }
   }
 
+  /** Pone o quita el dibujo de agujero negro (horizonte, disco y anillo de luz). */
+  private syncBlackHole(b: Body, cameraDistance: number): void {
+    if (b.blackHole && !this.blackHole) {
+      this.blackHole = new BlackHoleView(this.color);
+      this.group.add(this.blackHole.group);
+      this.mesh.visible = false;
+      // No da luz propia: solo el brillo tenue de su disco
+      if (this.light) this.light.intensity = BLACK_HOLE_LIGHT;
+    } else if (!b.blackHole && this.blackHole) {
+      this.group.remove(this.blackHole.group);
+      this.blackHole.dispose();
+      this.blackHole = null;
+      this.mesh.visible = true;
+      if (this.light) this.light.intensity = STAR_LIGHT;
+    }
+    this.blackHole?.update(cameraDistance, performance.now());
+  }
+
   /** Pone, gira o quita los haces si el cuerpo es (o deja de ser) un púlsar. */
   private syncBeams(b: Body, cameraDistance: number): void {
     if (b.pulsar && !this.beams) {
@@ -216,6 +243,7 @@ export class BodyView {
   dispose(): void {
     this.ring?.dispose();
     this.beams?.dispose();
+    this.blackHole?.dispose();
     // Las texturas incluidas son compartidas: solo se libera una imagen propia
     if (this.ownsMap) this.mesh.material.map?.dispose();
     this.mesh.geometry.dispose();

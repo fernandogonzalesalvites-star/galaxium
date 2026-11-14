@@ -1,7 +1,7 @@
 import { World } from './world';
 import { G, SOLAR_RADIUS_AU } from './units';
 
-export type StarType = 'redDwarf' | 'sunLike' | 'redGiant' | 'blueGiant' | 'pulsar' | 'binary';
+export type StarType = 'redDwarf' | 'sunLike' | 'redGiant' | 'blueGiant' | 'pulsar' | 'blackHole' | 'binary';
 
 export interface StarSpec {
   name: string;
@@ -14,6 +14,8 @@ export interface StarSpec {
   color: number;
   /** Estrella de neutrones con haces de radiación girando */
   pulsar?: boolean;
+  /** Agujero negro: mucha masa y nada de luz */
+  blackHole?: boolean;
 }
 
 export const SINGLE_STARS: Record<Exclude<StarType, 'binary'>, StarSpec> = {
@@ -25,6 +27,10 @@ export const SINGLE_STARS: Record<Exclude<StarType, 'binary'>, StarSpec> = {
   // Estrella de neutrones: apenas da calor. Su radio real (~10 km) sería invisible;
   // se agranda un poco para poder tocarla, y el marcador y los haces la señalan
   pulsar: { name: 'Púlsar', mass: 1.4, luminosity: 0.1, radiusSolar: 0.005, color: 0xc8e4ff, pulsar: true },
+  // Agujero negro de 10 masas solares: no da luz (su zona habitable no existe).
+  // Su horizonte real mide ~30 km; se dibuja con un disco de acreción que siempre
+  // se ve. El color es el del disco (marcador y estela)
+  blackHole: { name: 'Agujero negro', mass: 10, luminosity: 0, radiusSolar: 0.005, color: 0xff9a3c, blackHole: true },
 };
 
 export const BINARY_STAR: StarSpec & { separation: number } = {
@@ -59,7 +65,7 @@ export function createStarSystem(type: StarType): World {
     const s = SINGLE_STARS[type];
     world.add({
       name: s.name, kind: 'star', mass: s.mass, radius: s.radiusSolar * SOLAR_RADIUS_AU,
-      luminosity: s.luminosity, color: s.color, pulsar: s.pulsar ?? false,
+      luminosity: s.luminosity, color: s.color, pulsar: s.pulsar ?? false, blackHole: s.blackHole ?? false,
     });
   }
   return world;

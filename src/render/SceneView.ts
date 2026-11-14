@@ -70,13 +70,20 @@ export class SceneView {
     }
     const stars = world.stars();
     const starCenter = stars.length > 0 ? centerOfMass(stars) : null;
-    if (starCenter) {
+    // La zona habitable se centra en las estrellas que dan luz (pesando por su
+    // brillo), no en el centro de masas: un agujero negro pesa mucho pero no alumbra
+    const lit = stars.filter((s) => s.luminosity > 0);
+    if (lit.length > 0) {
       let luminosity = 0;
-      for (const s of stars) luminosity += s.luminosity;
+      const center = { x: 0, y: 0, z: 0 };
+      for (const s of lit) {
+        // Posición interpolada para que el anillo no tiemble respecto a la estrella
+        const p = interpolated(s, alpha);
+        luminosity += s.luminosity;
+        center.x += p.x * s.luminosity; center.y += p.y * s.luminosity; center.z += p.z * s.luminosity;
+      }
+      center.x /= luminosity; center.y /= luminosity; center.z /= luminosity;
       const zone = habitableZone(luminosity);
-      const c = interpolated(stars[0], alpha);
-      // Con una estrella se usa su posición interpolada para que el anillo no tiemble respecto a ella
-      const center = stars.length === 1 ? c : starCenter;
       this.habitableZone.update(zone.inner, zone.outer, {
         x: center.x - this.focus.x, y: center.y - this.focus.y, z: center.z - this.focus.z,
       });

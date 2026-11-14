@@ -41,6 +41,7 @@ export function snapshot(world: World, meta: { name: string; systemName: string;
       texture: b.texture,
       surface: b.surface,
       pulsar: b.pulsar,
+      blackHole: b.blackHole,
     })),
   };
 }
@@ -72,6 +73,7 @@ export function restoreWorld(data: SaveData): World {
       texture: b.texture ?? null,
       // Las partidas guardadas antes de existir los púlsares no traen este dato
       pulsar: b.pulsar ?? false,
+      blackHole: b.blackHole ?? false,
       // Las partidas de antes de las texturas incluidas reciben la de su tipo
       surface: isSurfaceStyle(b.surface) ? b.surface : defaultSurface(b.kind, b.parentId !== null),
       ax: 0, ay: 0, az: 0,

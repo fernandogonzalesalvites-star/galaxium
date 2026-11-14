@@ -99,6 +99,7 @@ export function placeStar(world: World, spec: StarSpec, x: number, z: number): B
     luminosity: spec.luminosity,
     color: spec.color,
     pulsar: spec.pulsar ?? false,
+    blackHole: spec.blackHole ?? false,
     x, y: c.y, z,
     vx: c.vx + (v * dz) / r,
     vy: c.vy,
