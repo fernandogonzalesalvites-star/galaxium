@@ -180,7 +180,7 @@ button { font: inherit; color: inherit; }
 .start-screen.choosing .start-title-sub { font-size: clamp(12px, 2vw, 17px); }
 .start-menu { flex: 1; display: flex; flex-direction: column; align-items: center; }
 /* «Jugar» a la izquierda, justo debajo del título */
-.start-menu-center { flex: 1; align-self: stretch; display: flex; align-items: flex-start; justify-content: flex-start; padding-top: clamp(28px, 7vh, 72px); }
+.start-menu-center { flex: 1; align-self: stretch; display: flex; align-items: flex-start; justify-content: flex-start; padding-top: clamp(60px, 22vh, 240px); }
 .start-play-btn {
   min-width: 220px; padding: 20px 48px; border-radius: 999px; cursor: pointer;
   font-size: 26px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase;
