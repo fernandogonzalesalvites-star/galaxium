@@ -135,9 +135,29 @@ button { font: inherit; color: inherit; }
 .start-dot { width: 36px; height: 36px; border-radius: 50%; }
 .start-desc { font-size: 13px; opacity: 0.75; }
 .install-button {
-  margin-top: 4px; padding: 12px 22px; border-radius: 999px; cursor: pointer;
-  border: 1px solid rgba(140, 190, 255, 0.5); background: rgba(40, 80, 160, 0.35);
-  color: inherit; font: inherit; font-weight: 600;
+  margin-top: 8px; padding: 14px 28px; border-radius: 999px; cursor: pointer;
+  border: 1px solid rgba(140, 190, 255, 0.6); background: rgba(40, 90, 190, 0.55);
+  box-shadow: 0 0 24px rgba(80, 140, 255, 0.25);
+  color: inherit; font: inherit; font-size: 16px; font-weight: 700;
 }
 .install-button[hidden] { display: none; }
 .install-button:active { transform: scale(0.96); }
+.install-help {
+  position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center;
+  padding: 24px; background: rgba(0, 0, 0, 0.7); user-select: text;
+}
+.install-help-box {
+  width: 100%; max-width: 380px; display: flex; flex-direction: column; gap: 14px; padding: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 18px; background: #0c1020;
+}
+.install-help-box h2 { font-size: 20px; }
+.install-help-body { display: flex; flex-direction: column; gap: 10px; font-size: 15px; line-height: 1.45; opacity: 0.9; }
+.install-help-body ol { padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
+.install-help-link {
+  display: block; padding: 12px; border-radius: 12px; text-align: center; font-weight: 700;
+  color: #fff; text-decoration: none; background: rgba(40, 90, 190, 0.7);
+}
+.install-help-close {
+  padding: 12px; border-radius: 12px; cursor: pointer; font-weight: 600;
+  border: 1px solid rgba(255, 255, 255, 0.2); background: rgba(255, 255, 255, 0.08);
+}
