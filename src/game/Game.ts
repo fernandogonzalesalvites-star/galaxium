@@ -52,9 +52,9 @@ const HINT_GALAXY = 'Arrastra para elegir dónde irá la galaxia y suelta para c
 const HINT_STAR ='Arrastra para elegir dónde orbitará la nueva estrella y suelta para colocarla';
 const HINT_MOON ='Arrastra alrededor del planeta y suelta para colocar la luna';
 const INFO_REFRESH_MS = 250;
-/** Un proyectil va despacio: tarda unos 9 segundos reales en llegar (como mucho 18 días simulados) */
-const LAUNCH_SECONDS = 9;
-const MAX_TRAVEL_YEARS = 18 / 365.25;
+/** Un proyectil va despacio: tarda unos 20 segundos reales en llegar (como mucho 25 días simulados) */
+const LAUNCH_SECONDS = 20;
+const MAX_TRAVEL_YEARS = 25 / 365.25;
 /** Velocidad del fondo del menú (×10: las estrellas dan una vuelta cada ~3 s) */
 const DEMO_SPEED_INDEX = 2;
 /** Radio (UA) que se encuadra en el fondo del menú */
@@ -232,7 +232,7 @@ export class Game implements InputHandlers {
           if (!t) return;
           // Si estaba en pausa, se pone a ×1 para ver el choque
           if (this.clock.speedIndex === 0) this.setSpeed(1);
-          // Va despacio: llega en unos 9 segundos a la velocidad actual (sin pasar de 18 días simulados)
+          // Va despacio: llega en unos 20 segundos a la velocidad actual (sin pasar de 25 días simulados)
           const travelYears = Math.min(LAUNCH_SECONDS * this.clock.requestedYearsPerSecond, MAX_TRAVEL_YEARS);
           const p = launchProjectile(this.world, t, { ...opts, travelYears });
           this.world.snapRenderState();

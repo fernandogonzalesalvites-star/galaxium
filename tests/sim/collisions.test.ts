@@ -63,8 +63,8 @@ describe('lanzar proyectiles', () => {
     expect(a.mass).toBeCloseTo(rockyMass(PROJECTILE_SPECS.asteroid.max, 0.5), 15);
   });
 
-  it('aunque vaya lento (9 o 18 días) sigue acertando, en cualquier dirección', () => {
-    for (const travel of [9 / 365.25, 18 / 365.25]) {
+  it('aunque vaya lento (20 o 25 días) sigue acertando, en cualquier dirección', () => {
+    for (const travel of [20 / 365.25, 25 / 365.25]) {
       for (const angle of [0.1, 0.35, 0.6, 0.85]) {
         const { w, earth } = system();
         const rock = launchProjectile(w, earth, { type: 'asteroid', radiusEarth: 0.05, color: 0x888888, travelYears: travel }, () => angle);
