@@ -2,6 +2,7 @@ import type { Body, BodyInit } from './body';
 import type { Vec3 } from './vec';
 import { G, SOFTENING2 } from './units';
 import { defaultSurface } from './surfaces';
+import { defaultDayHours } from './rotation';
 
 export class World {
   bodies: Body[] = [];
@@ -38,6 +39,7 @@ export class World {
       blackHole: init.blackHole ?? false,
       galaxyType: init.galaxyType ?? null,
       vegetation: init.vegetation ?? 0,
+      dayHours: init.dayHours ?? defaultDayHours(init.kind, (init.parentId ?? null) !== null),
     };
     this.bodies.push(body);
     this.accelValid = false;

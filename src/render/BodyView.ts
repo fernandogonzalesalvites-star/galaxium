@@ -94,7 +94,7 @@ export class BodyView {
 
   update(
     b: Body, alpha: number, focus: Vec3, center: Vec3 | null, time: number,
-    camera: THREE.PerspectiveCamera, viewportHeightPx: number,
+    camera: THREE.PerspectiveCamera, viewportHeightPx: number, spinSeconds = 0,
   ): void {
     if (b.color !== this.colorHex) this.setColor(b.color);
     this.syncSurface(b);
@@ -103,6 +103,12 @@ export class BodyView {
     this.group.position.set(p.x - focus.x, p.y - focus.y, p.z - focus.z);
     const r = visualRadius(b);
     this.mesh.scale.setScalar(r);
+    // Rotación: una vuelta cada `dayHours` segundos reales (1 hora del planeta = 1 segundo).
+    // Gira la esfera con su textura y su vegetación; los anillos van aparte y no se tambalean
+    if (b.dayHours > 0 && spinSeconds > 0) {
+      this.mesh.rotation.y = (this.mesh.rotation.y + (spinSeconds / b.dayHours) * Math.PI * 2) % (Math.PI * 2);
+    }
+    this.ring?.mesh.scale.setScalar(r);
     const dist = Math.max(camera.position.distanceTo(this.group.position), 1e-12);
     const halfFov = THREE.MathUtils.degToRad(camera.fov / 2);
     this.screenRadiusPx = (r / (dist * Math.tan(halfFov))) * (viewportHeightPx / 2);
@@ -292,7 +298,7 @@ export class BodyView {
     this.ringKey = key;
     if (!b.ring) {
       if (this.ring) {
-        this.mesh.remove(this.ring.mesh);
+        this.group.remove(this.ring.mesh);
         this.ring.dispose();
         this.ring = null;
       }
@@ -301,8 +307,8 @@ export class BodyView {
     if (this.ring) this.ring.set(b.ring);
     else {
       this.ring = new RingView(b.ring, b.id);
-      // Hijo de la esfera: hereda su escala (radio visual)
-      this.mesh.add(this.ring.mesh);
+      // Fuera de la esfera para que no gire con ella; su escala se copia en cada update
+      this.group.add(this.ring.mesh);
     }
   }
 

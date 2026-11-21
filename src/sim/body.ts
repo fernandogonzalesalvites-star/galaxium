@@ -51,6 +51,8 @@ export interface Body {
   galaxyType: GalaxyType | null;
   /** Vegetación de un cuerpo rocoso: 0 = no tiene; otro número = semilla del dibujo al azar */
   vegetation: number;
+  /** Duración del día en horas (planetas y lunas; 0 = no gira). En pantalla, 1 hora = 1 segundo */
+  dayHours: number;
 }
 
 export interface BodyInit {
@@ -72,4 +74,5 @@ export interface BodyInit {
   blackHole?: boolean;
   galaxyType?: GalaxyType | null;
   vegetation?: number;
+  dayHours?: number;
 }

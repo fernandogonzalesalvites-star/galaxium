@@ -61,7 +61,8 @@ export class SceneView {
     this.camera.updateProjectionMatrix();
   }
 
-  sync(world: World, alpha: number): void {
+  /** `spinSeconds`: segundos reales que han pasado para la rotación de los planetas (0 en pausa). */
+  sync(world: World, alpha: number, spinSeconds = 0): void {
     this.syncViews(world);
     if (this.followId !== null) {
       const followed = world.get(this.followId);
@@ -98,7 +99,7 @@ export class SceneView {
       const view = this.views.get(b.id)!;
       if (refresh) this.applyTrailTiming(view, world, b);
       const center = this.trailCenter(world, b, anchors.length, starCenter, alpha);
-      view.update(b, alpha, this.focus, center, world.time, this.camera, height);
+      view.update(b, alpha, this.focus, center, world.time, this.camera, height, spinSeconds);
     }
     this.starfield.position.copy(this.camera.position);
   }

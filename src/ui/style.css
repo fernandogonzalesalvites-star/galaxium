@@ -55,6 +55,9 @@ button { font: inherit; color: inherit; }
 .hud-veg:disabled { opacity: 0.45; cursor: not-allowed; }
 .hud-veg-remove { flex: 0 0 auto !important; }
 .hud-veg-note { font-size: 13px; opacity: 0.8; }
+.hud-rot { font-weight: 600; border-color: rgba(156, 196, 255, 0.45); background: rgba(40, 70, 140, 0.5); }
+.rotation-error { font-size: 14px; font-weight: 600; color: #ffb38a; }
+.editor-text[aria-invalid='true'] { border-color: #ff9a7a; }
 .hud-placement-climate { font-weight: 600; min-height: 1.2em; }
 .hud-placement-climate[data-tone='good'] { color: #6ee7a0; }
 .hud-placement-climate[data-tone='bad'] { color: #9cc4ff; }

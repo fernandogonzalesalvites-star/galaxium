@@ -2,6 +2,7 @@ import type { Body } from '../sim/body';
 import type { World } from '../sim/world';
 import { centerOfMass, centralMassFor, relativeOrbit } from '../sim/elements';
 import { GALAXY_SPECS, galaxies } from '../sim/galaxies';
+import { formatDayHours } from '../sim/rotation';
 import { formatGalacticElapsed, formatGalaxyMass, formatLightYears } from './format';
 import { EARTH_MASS, EARTH_RADIUS_AU, SOLAR_RADIUS_AU } from '../sim/units';
 import { evaluateHabitability, habitableZone } from '../life/habitability';
@@ -19,6 +20,8 @@ export interface BodyInfo {
    * 'unavailable' gigante de gas o hielo (no crece), null si no es un planeta ni una luna.
    */
   vegetation?: 'none' | 'grown' | 'unavailable' | null;
+  /** Se le puede cambiar la rotación (planetas y lunas) */
+  canRotate?: boolean;
 }
 
 export function kindLabel(body: Body): string {
@@ -83,7 +86,11 @@ export function describeBody(world: World, body: Body): BodyInfo {
       ['Excentricidad', orbit.bound ? num(orbit.eccentricity, 3) : 'Sin órbita'],
     );
   }
-  rows.push(['Temperatura', formatTemperature(h.temperature)], ['Atmósfera', formatPercent(body.atmosphere)]);
+  rows.push(
+    ['Temperatura', formatTemperature(h.temperature)],
+    ['Atmósfera', formatPercent(body.atmosphere)],
+    ['Día', formatDayHours(body.dayHours)],
+  );
   if (body.kind === 'rocky') {
     rows.push(['Agua', formatPercent(body.water)], ['Vegetación', body.vegetation ? 'Sí' : 'No']);
   }
@@ -93,5 +100,6 @@ export function describeBody(world: World, body: Body): BodyInfo {
     rows,
     status: { habitable: h.habitable, text: h.habitable ? 'Habitable' : `No habitable: ${h.reason!.toLowerCase()}` },
     vegetation: body.kind === 'rocky' ? (body.vegetation ? 'grown' : 'none') : 'unavailable',
+    canRotate: true,
   };
 }

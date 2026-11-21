@@ -23,6 +23,7 @@ import {
 import { restoreWorld, snapshot, type SaveData } from './save';
 import { createDemoSystem } from './demo';
 import { canGrowVegetation, growVegetation, removeVegetation } from './vegetation';
+import { canRotate, formatDayHours } from '../sim/rotation';
 import type { Universe } from './save';
 import {
   applyGalaxyType, checkGalaxyPlacement, createGalaxyUniverse, galaxies, GALAXY_SPECS, MAX_GALAXIES, mergeGalaxies,
@@ -167,15 +168,17 @@ export class Game implements InputHandlers {
     if (!this.started) {
       if (this.demo) {
         this.clock.advance(seconds, this.stepAndRecord);
-        this.view.sync(this.world, this.clock.alpha);
+        this.view.sync(this.world, this.clock.alpha, Math.min(seconds, 0.1));
       }
       this.view.render();
       return;
     }
     this.clock.advance(seconds, this.stepAndRecord);
-    this.view.sync(this.world, this.clock.alpha);
-    this.view.render();
     const paused = this.mode.kind !== 'idle';
+    // Los planetas giran en tiempo real (1 hora de su día = 1 segundo), salvo en pausa
+    const spin = paused || this.clock.speedIndex === 0 ? 0 : Math.min(seconds, 0.1);
+    this.view.sync(this.world, this.clock.alpha, spin);
+    this.view.render();
     const speed = paused ? 0 : this.clock.throttled ? this.clock.smoothedYearsPerSecond : this.clock.requestedYearsPerSecond;
     this.hud.setTime(this.world.time, speed, !paused && this.clock.throttled);
     if (this.selectedId !== null && !this.world.get(this.selectedId)) this.select(null);
@@ -361,6 +364,31 @@ export class Game implements InputHandlers {
     growVegetation(body);
     this.hud.toast(had ? `🌿 Nueva vegetación en ${body.name}` : `🌿 Creció vegetación en ${body.name}`);
     this.refreshInfo();
+  }
+
+  /** Abre la edición de la rotación del planeta o luna elegido. El juego queda en pausa mientras. */
+  editRotationSelected(): void {
+    if (this.selectedId === null || this.mode.kind !== 'idle') return;
+    const body = this.world.get(this.selectedId);
+    if (!body || !canRotate(body)) return;
+    const id = body.id;
+    this.pause();
+    this.mode = { kind: 'editing', id };
+    this.hud.openRotation(
+      { name: body.name, hours: body.dayHours },
+      {
+        onApply: (hours) => {
+          const b = this.world.get(id);
+          if (b) {
+            b.dayHours = hours;
+            this.hud.toast(`⟳ El día de ${b.name} ahora dura ${formatDayHours(hours)}`);
+          }
+          this.exitMode();
+          this.select(id);
+        },
+        onCancel: () => this.exitMode(),
+      },
+    );
   }
 
   removeVegetationSelected(): void {

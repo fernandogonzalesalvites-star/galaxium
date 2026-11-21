@@ -24,6 +24,7 @@ const hud = new Hud(app, {
   onAddGalaxy: (type) => game.requestAddGalaxy(type),
   onVegetation: () => game.vegetationSelected(),
   onRemoveVegetation: () => game.removeVegetationSelected(),
+  onRotation: () => game.editRotationSelected(),
   onCancelPlacement: () => game.cancelPlacement(),
   onFrameSystem: () => game.frameSystem(),
   onEdit: () => game.editSelected(),

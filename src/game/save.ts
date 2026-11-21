@@ -2,6 +2,7 @@ import type { Body, BodyKind } from '../sim/body';
 import { World } from '../sim/world';
 import { defaultSurface, isSurfaceStyle } from '../sim/surfaces';
 import { GALAXY_SOFTENING2, isGalaxyType } from '../sim/galaxies';
+import { defaultDayHours } from '../sim/rotation';
 
 export const SAVE_VERSION = 1;
 
@@ -54,6 +55,7 @@ export function snapshot(
       blackHole: b.blackHole,
       galaxyType: b.galaxyType,
       vegetation: b.vegetation,
+      dayHours: b.dayHours,
     })),
   };
 }
@@ -90,6 +92,8 @@ export function restoreWorld(data: SaveData): World {
       galaxyType: b.kind === 'galaxy' && isGalaxyType(b.galaxyType) ? b.galaxyType : b.kind === 'galaxy' ? 'spiral' : null,
       // Las partidas de antes de la vegetación no la traen
       vegetation: b.kind === 'rocky' && Number.isFinite(b.vegetation) ? b.vegetation : 0,
+      // Las partidas de antes de la rotación reciben el día de su tipo
+      dayHours: Number.isFinite(b.dayHours) && b.dayHours >= 0 ? b.dayHours : defaultDayHours(b.kind, b.parentId !== null),
       // Las partidas de antes de las texturas incluidas reciben la de su tipo
       surface: isSurfaceStyle(b.surface) ? b.surface : defaultSurface(b.kind, b.parentId !== null),
       ax: 0, ay: 0, az: 0,

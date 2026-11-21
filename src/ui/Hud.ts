@@ -5,6 +5,7 @@ import { PLANET_PRESETS, PLANET_TYPES, type PlanetType } from '../sim/planetType
 import { formatElapsed, formatGalacticElapsed, formatGalacticSpeed, formatSpeed } from './format';
 import { GALAXY_SPECS, GALAXY_TYPES, type GalaxyType } from '../sim/galaxies';
 import type { Universe } from '../game/save';
+import { showRotationDialog } from './rotationDialog';
 import type { BodyInfo } from './bodyInfo';
 import { Editor, type EditorHandlers, type EditorModel, type PreviewTone } from './Editor';
 
@@ -18,6 +19,8 @@ export interface HudHandlers {
   /** Hacer crecer vegetación al azar en el planeta elegido (otra distinta si ya tenía) */
   onVegetation(): void;
   onRemoveVegetation(): void;
+  /** Abrir la edición de la rotación (duración del día) del planeta elegido */
+  onRotation(): void;
   onCancelPlacement(): void;
   onFrameSystem(): void;
   onEdit(): void;
@@ -51,6 +54,7 @@ export class Hud {
   private readonly vegButton = el('button', 'hud-btn hud-veg');
   private readonly vegRemove = el('button', 'hud-btn hud-veg-remove hidden', 'Quitar');
   private readonly vegNote = el('span', 'hud-veg-note hidden', 'Solo crece en planetas rocosos');
+  private readonly rotButton = el('button', 'hud-btn hud-rot hidden');
   private readonly placementClimate = el('div', 'hud-placement-climate');
   private readonly placement = el('div', 'hud-placement hidden');
   private readonly placementHint = el('div', 'hud-placement-hint');
@@ -93,9 +97,13 @@ export class Hud {
     this.vegButton.innerHTML = '<span aria-hidden="true">🌿</span> Vegetación';
     this.vegButton.onclick = () => h.onVegetation();
     this.vegRemove.onclick = () => h.onRemoveVegetation();
+    // Vegetación y rotación en la misma fila para que la ficha no tape tanto en el celular
     const vegRow = el('div', 'hud-sheet-actions');
-    vegRow.append(this.vegButton, this.vegRemove);
+    vegRow.append(this.vegButton, this.vegRemove, this.rotButton);
     this.vegBox.append(vegRow, this.vegNote);
+    // Rotación: abre una edición solo para la duración del día
+    this.rotButton.innerHTML = '<span aria-hidden="true">⟳</span> Rotación';
+    this.rotButton.onclick = () => h.onRotation();
     this.sheet.append(sheetHead, this.sheetStatus, this.sheetRows, sheetActions, this.vegBox);
 
     const time = el('div', 'hud-time');
@@ -219,11 +227,17 @@ export class Hud {
     this.vegButton.disabled = veg === 'unavailable';
     this.vegRemove.classList.toggle('hidden', veg !== 'grown');
     this.vegNote.classList.toggle('hidden', veg !== 'unavailable');
+    this.rotButton.classList.toggle('hidden', !info.canRotate);
   }
 
   openEditor(model: EditorModel, handlers: EditorHandlers): void {
     this.addMenu.classList.add('hidden');
     new Editor(this.parent, model, handlers);
+  }
+
+  openRotation(opts: { name: string; hours: number }, handlers: { onApply(hours: number): void; onCancel(): void }): void {
+    this.addMenu.classList.add('hidden');
+    showRotationDialog(this.parent, opts, handlers);
   }
 
   showPlacement(
