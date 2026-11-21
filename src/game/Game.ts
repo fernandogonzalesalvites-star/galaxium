@@ -24,6 +24,8 @@ import { restoreWorld, snapshot, type SaveData } from './save';
 import { createDemoSystem } from './demo';
 import { canGrowVegetation, growVegetation, removeVegetation } from './vegetation';
 import { canRotate, formatDayHours } from '../sim/rotation';
+import { mergeCollisions, type Impact } from '../sim/collisions';
+import { LAUNCH_DISTANCE, launchProjectile } from '../sim/projectiles';
 import type { Universe } from './save';
 import {
   applyGalaxyType, checkGalaxyPlacement, createGalaxyUniverse, galaxies, GALAXY_SPECS, MAX_GALAXIES, mergeGalaxies,
@@ -50,6 +52,9 @@ const HINT_GALAXY = 'Arrastra para elegir dónde irá la galaxia y suelta para c
 const HINT_STAR ='Arrastra para elegir dónde orbitará la nueva estrella y suelta para colocarla';
 const HINT_MOON ='Arrastra alrededor del planeta y suelta para colocar la luna';
 const INFO_REFRESH_MS = 250;
+/** Un proyectil tarda unos segundos reales en llegar, y como mucho 18 días simulados */
+const LAUNCH_SECONDS = 2.5;
+const MAX_TRAVEL_YEARS = 18 / 365.25;
 /** Velocidad del fondo del menú (×10: las estrellas dan una vuelta cada ~3 s) */
 const DEMO_SPEED_INDEX = 2;
 /** Radio (UA) que se encuadra en el fondo del menú */
@@ -89,6 +94,9 @@ export class Game implements InputHandlers {
     this.world.step(dt);
     if (this.universe === 'galaxies') {
       for (const m of mergeGalaxies(this.world)) this.pendingToasts.push(`¡${m.eaten} se fusionó con ${m.into}!`);
+    } else if (this.started) {
+      // Choques entre planetas, lunas y asteroides: se fusionan (se dibujan en el siguiente fotograma)
+      this.pendingImpacts.push(...mergeCollisions(this.world));
     }
     this.view.recordTrails(this.world);
   };
@@ -97,6 +105,8 @@ export class Game implements InputHandlers {
   universe: Universe = 'stars';
   /** Avisos de fusiones ocurridas durante la simulación, para mostrar en el siguiente fotograma */
   private pendingToasts: string[] = [];
+  /** Choques ocurridos durante la simulación, para dibujar en el siguiente fotograma */
+  private pendingImpacts: Impact[] = [];
 
   attach(hud: Hud, input: TouchInput): void {
     this.hud = hud;
@@ -188,6 +198,51 @@ export class Game implements InputHandlers {
       for (const t of this.pendingToasts) this.hud.toast(t);
       this.pendingToasts = [];
     }
+    if (this.pendingImpacts.length) this.handleImpacts();
+  }
+
+  /** Dibuja los choques recientes: cráter y fragmentos; la cámara y la ficha pasan al que quedó. */
+  private handleImpacts(): void {
+    for (const impact of this.pendingImpacts) {
+      if (!this.world.get(impact.survivorId)) continue;
+      this.view.showImpact(impact);
+      // Su órbita cambió: la estela empieza de nuevo
+      this.view.resetTrails(this.world, impact.survivorId);
+      if (this.view.followId === impact.eatenId) this.view.followId = impact.survivorId;
+      if (this.selectedId === impact.eatenId || this.selectedId === impact.survivorId) this.select(impact.survivorId);
+      this.hud.toast(`💥 ${impact.eatenName} chocó con ${impact.survivorName}`);
+    }
+    this.pendingImpacts = [];
+  }
+
+  /** Abre la ventana para lanzar un proyectil contra el planeta o luna elegido. */
+  launchAtSelected(): void {
+    if (this.selectedId === null || this.mode.kind !== 'idle') return;
+    const target = this.world.get(this.selectedId);
+    if (!target || !canRotate(target)) return;
+    const id = target.id;
+    this.pause();
+    this.mode = { kind: 'editing', id };
+    this.hud.openLaunch(
+      { name: target.name },
+      {
+        onLaunch: (opts) => {
+          this.exitMode();
+          const t = this.world.get(id);
+          if (!t) return;
+          // Si estaba en pausa, se pone a ×1 para ver el choque
+          if (this.clock.speedIndex === 0) this.setSpeed(1);
+          // Llega en unos 2,5 segundos a la velocidad actual (sin pasar de 18 días simulados)
+          const travelYears = Math.min(LAUNCH_SECONDS * this.clock.requestedYearsPerSecond, MAX_TRAVEL_YEARS);
+          const p = launchProjectile(this.world, t, { ...opts, travelYears });
+          this.world.snapRenderState();
+          this.view.follow(id, this.world, visualRadius(t) * LAUNCH_DISTANCE * 1.5);
+          this.hud.toast(`☄️ ${p.name} va directo hacia ${t.name}`);
+          this.select(id);
+        },
+        onCancel: () => this.exitMode(),
+      },
+    );
   }
 
   setSpeed(index: number): void {

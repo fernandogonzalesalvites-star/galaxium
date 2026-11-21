@@ -17,6 +17,8 @@ const BLACK_HOLE_LIGHT = 0.4;
 import { surfaceTexture, vegetationTexture } from './surfaceTextures';
 import { flattening } from '../sim/rotation';
 import { EclipseShell, type EclipseShadow } from './EclipseShell';
+import { CraterView, DebrisBurst } from './ImpactViews';
+import type { Impact } from '../sim/collisions';
 
 /** La capa de vegetación va un 0,4 % por encima de la superficie */
 const VEGETATION_LIFT = 1.004;
@@ -28,6 +30,9 @@ const VEGETATION_LIFT = 1.004;
 const VEGETATION_ORDER = 1;
 const SHADOW_ORDER = 2;
 const RING_ORDER = 3;
+/** Cráteres: sobre la vegetación y bajo la sombra de los eclipses */
+const CRATER_ORDER = 1.5;
+const MAX_CRATERS = 6;
 /** La capa de los eclipses va un 0,6 % por encima de la superficie (sobre la vegetación) */
 const ECLIPSE_LIFT = 1.006;
 
@@ -132,6 +137,7 @@ export class BodyView {
     this.syncBlackHole(b, dist);
     this.syncGalaxy(b, time);
     this.syncVegetation(b);
+    this.ageImpacts(spinSeconds);
     // La capa del eclipse sigue la forma de la esfera (también si está achatada), sin girar con ella
     if (this.eclipse) this.eclipse.mesh.scale.copy(this.mesh.scale).multiplyScalar(ECLIPSE_LIFT);
     // El agujero negro siempre se ve por su disco: el punto marcador lo taparía
@@ -261,6 +267,46 @@ export class BodyView {
     });
   }
 
+  private readonly craters: CraterView[] = [];
+  private readonly bursts: DebrisBurst[] = [];
+
+  /**
+   * Un choque contra este cuerpo: deja un cráter (que gira con la superficie y
+   * se va borrando) y lanza fragmentos con un destello.
+   */
+  addImpact(impact: Impact): void {
+    const n = new THREE.Vector3(impact.normal.x, impact.normal.y, impact.normal.z);
+    // La esfera está girada (rotación del día): se pasa el punto a sus coordenadas
+    const local = n.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), -this.mesh.rotation.y);
+    const crater = new CraterView(local, (1.3 * impact.impactorRadius) / impact.survivorRadius);
+    crater.mesh.renderOrder = CRATER_ORDER;
+    this.mesh.add(crater.mesh);
+    this.craters.push(crater);
+    // Como mucho unos cuantos cráteres a la vez: el más viejo se quita
+    if (this.craters.length > MAX_CRATERS) this.removeCrater(this.craters[0]);
+    const burst = new DebrisBurst(n, impact.survivorRadius, impact.impactorRadius, impact.colors);
+    this.group.add(burst.group);
+    this.bursts.push(burst);
+  }
+
+  private removeCrater(c: CraterView): void {
+    this.mesh.remove(c.mesh);
+    c.dispose();
+    this.craters.splice(this.craters.indexOf(c), 1);
+  }
+
+  /** Los cráteres se enfrían y se borran; los fragmentos vuelan y se apagan (se detiene en pausa). */
+  private ageImpacts(dt: number): void {
+    if (dt <= 0) return;
+    for (const c of [...this.craters]) if (!c.update(dt)) this.removeCrater(c);
+    for (const b of [...this.bursts]) {
+      if (b.update(dt)) continue;
+      this.group.remove(b.group);
+      b.dispose();
+      this.bursts.splice(this.bursts.indexOf(b), 1);
+    }
+  }
+
   /**
    * Eclipse sobre este cuerpo: la sombra de una luna (eclipse de sol) o la del
    * planeta sobre una luna (eclipse de luna). null = sin eclipse.
@@ -355,6 +401,8 @@ export class BodyView {
     this.blackHole?.dispose();
     this.galaxy?.dispose();
     this.eclipse?.dispose();
+    for (const c of this.craters) c.dispose();
+    for (const b of this.bursts) b.dispose();
     // La textura de vegetación es compartida (caché): solo se libera la esfera
     this.vegetation?.geometry.dispose();
     this.vegetation?.material.dispose();

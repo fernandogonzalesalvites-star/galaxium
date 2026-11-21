@@ -28,6 +28,7 @@ const hud = new Hud(app, {
   onVegetation: () => game.vegetationSelected(),
   onRemoveVegetation: () => game.removeVegetationSelected(),
   onRotation: () => game.editRotationSelected(),
+  onLaunch: () => game.launchAtSelected(),
   onToggleEvents: () => {
     game.toggleEvents();
     // Se recuerda en este dispositivo para la próxima vez

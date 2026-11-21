@@ -6,6 +6,7 @@ import { formatElapsed, formatGalacticElapsed, formatGalacticSpeed, formatSpeed 
 import { GALAXY_SPECS, GALAXY_TYPES, type GalaxyType } from '../sim/galaxies';
 import type { Universe } from '../game/save';
 import { showRotationDialog } from './rotationDialog';
+import { showLaunchDialog, type LaunchOptions } from './launchDialog';
 import type { BodyInfo } from './bodyInfo';
 import { Editor, type EditorHandlers, type EditorModel, type PreviewTone } from './Editor';
 
@@ -23,6 +24,8 @@ export interface HudHandlers {
   onRotation(): void;
   /** Activar o apagar los eventos (eclipses) */
   onToggleEvents(): void;
+  /** Abrir la ventana para lanzar un proyectil contra el planeta elegido */
+  onLaunch(): void;
   onCancelPlacement(): void;
   onFrameSystem(): void;
   onEdit(): void;
@@ -58,6 +61,7 @@ export class Hud {
   private readonly vegNote = el('span', 'hud-veg-note hidden', 'Solo crece en planetas rocosos');
   private readonly rotButton = el('button', 'hud-btn hud-rot hidden');
   private readonly eventsButton = el('button', 'hud-btn hud-events');
+  private readonly launchButton = el('button', 'hud-btn hud-launch');
   private readonly placementClimate = el('div', 'hud-placement-climate');
   private readonly placement = el('div', 'hud-placement hidden');
   private readonly placementHint = el('div', 'hud-placement-hint');
@@ -108,7 +112,10 @@ export class Hud {
     // Vegetación y rotación en la misma fila para que la ficha no tape tanto en el celular
     const vegRow = el('div', 'hud-sheet-actions');
     vegRow.append(this.vegButton, this.vegRemove, this.rotButton);
-    this.vegBox.append(vegRow, this.vegNote);
+    // Lanzar: botón mediano debajo, para tirarle un asteroide o un planeta rocoso
+    this.launchButton.innerHTML = '<span aria-hidden="true">☄️</span> Lanzar';
+    this.launchButton.onclick = () => h.onLaunch();
+    this.vegBox.append(vegRow, this.vegNote, this.launchButton);
     // Rotación: abre una edición solo para la duración del día
     this.rotButton.innerHTML = '<span aria-hidden="true">⟳</span> Rotación';
     this.rotButton.onclick = () => h.onRotation();
@@ -254,6 +261,11 @@ export class Hud {
   openRotation(opts: { name: string; hours: number }, handlers: { onApply(hours: number): void; onCancel(): void }): void {
     this.addMenu.classList.add('hidden');
     showRotationDialog(this.parent, opts, handlers);
+  }
+
+  openLaunch(opts: { name: string }, handlers: { onLaunch(o: LaunchOptions): void; onCancel(): void }): void {
+    this.addMenu.classList.add('hidden');
+    showLaunchDialog(this.parent, opts, handlers);
   }
 
   showPlacement(

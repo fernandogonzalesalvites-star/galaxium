@@ -13,6 +13,7 @@ import { createStarfield } from './starfield';
 import { HabitableZoneView } from './HabitableZoneView';
 import { habitableZone } from '../life/habitability';
 import type { EclipseShadow } from './EclipseShell';
+import type { Impact } from '../sim/collisions';
 
 /** Radio mínimo (px) alrededor de un cuerpo que cuenta como tocarlo */
 const PICK_RADIUS_PX = 28;
@@ -197,6 +198,11 @@ export class SceneView {
     offset.setLength(distance);
     this.controls.target.set(0, 0, 0);
     this.camera.position.copy(offset);
+  }
+
+  /** Dibuja un choque (cráter y fragmentos) sobre el cuerpo que quedó. */
+  showImpact(impact: Impact): void {
+    this.views.get(impact.survivorId)?.addImpact(impact);
   }
 
   /** Eventos activados: se dibujan los eclipses */
