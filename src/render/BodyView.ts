@@ -16,6 +16,7 @@ const STAR_LIGHT = 3;
 const BLACK_HOLE_LIGHT = 0.4;
 import { surfaceTexture, vegetationTexture } from './surfaceTextures';
 import { flattening } from '../sim/rotation';
+import { EclipseShell, type EclipseShadow } from './EclipseShell';
 
 /** La capa de vegetación va un 0,4 % por encima de la superficie */
 const VEGETATION_LIFT = 1.004;
@@ -27,30 +28,8 @@ const VEGETATION_LIFT = 1.004;
 const VEGETATION_ORDER = 1;
 const SHADOW_ORDER = 2;
 const RING_ORDER = 3;
-/** Color de una luna eclipsada («luna de sangre») */
-const BLOOD_MOON = new THREE.Color(0.75, 0.12, 0.05);
-const WHITE = new THREE.Color(1, 1, 1);
-
-let shadowTexture: THREE.DataTexture | null = null;
-/** Mancha redonda y difusa para la sombra de una luna sobre su planeta. */
-function shadowAlpha(): THREE.DataTexture {
-  if (shadowTexture) return shadowTexture;
-  const n = 64;
-  const data = new Uint8Array(n * n * 4);
-  for (let j = 0; j < n; j++) {
-    for (let i = 0; i < n; i++) {
-      const d = Math.hypot(i - n / 2 + 0.5, j - n / 2 + 0.5) / (n / 2);
-      // Centro oscuro (sombra) y borde suave (penumbra)
-      const a = d < 0.55 ? 1 : Math.max(0, 1 - (d - 0.55) / 0.45);
-      const v = Math.round(255 * a * a);
-      data.set([v, v, v, 255], (j * n + i) * 4);
-    }
-  }
-  shadowTexture = new THREE.DataTexture(data, n, n);
-  shadowTexture.magFilter = THREE.LinearFilter;
-  shadowTexture.needsUpdate = true;
-  return shadowTexture;
-}
+/** La capa de los eclipses va un 0,6 % por encima de la superficie (sobre la vegetación) */
+const ECLIPSE_LIFT = 1.006;
 
 const textureLoader = new THREE.TextureLoader();
 
@@ -87,9 +66,8 @@ export class BodyView {
   private galaxy: GalaxyView | null = null;
   private vegetation: THREE.Mesh<THREE.SphereGeometry, THREE.MeshStandardMaterial> | null = null;
   private vegetationSeed = 0;
-  /** Eclipse de luna: 0 normal … 1 del todo roja (lo pone SceneView en cada fotograma) */
-  eclipseRed = 0;
-  private shadow: THREE.Mesh<THREE.CircleGeometry, THREE.MeshBasicMaterial> | null = null;
+  /** Capa donde se dibuja la sombra de un eclipse (se crea la primera vez que hace falta) */
+  private eclipse: EclipseShell | null = null;
   private galaxyType: GalaxyType | null = null;
   private ringKey = '';
   /** Data URL de la textura que se está mostrando (null = color liso) */
@@ -154,8 +132,8 @@ export class BodyView {
     this.syncBlackHole(b, dist);
     this.syncGalaxy(b, time);
     this.syncVegetation(b);
-    if (b.kind !== 'star' && b.kind !== 'galaxy') this.applyEclipseTint();
-    if (this.shadow) this.shadow.position.copy(this.shadowNormal).multiplyScalar(r * 1.006);
+    // La capa del eclipse sigue la forma de la esfera (también si está achatada), sin girar con ella
+    if (this.eclipse) this.eclipse.mesh.scale.copy(this.mesh.scale).multiplyScalar(ECLIPSE_LIFT);
     // El agujero negro siempre se ve por su disco: el punto marcador lo taparía
     this.marker.visible = !this.blackHole && this.screenRadiusPx < MARKER_HIDE_PX;
     this.updateTrail(p, alpha, focus, center, time);
@@ -283,42 +261,19 @@ export class BodyView {
     });
   }
 
-  /** Eclipse de luna: el color de la superficie (y de la vegetación) se vuelve rojo oscuro. */
-  private applyEclipseTint(): void {
-    const t = this.eclipseRed;
-    const material = this.mesh.material;
-    material.color.copy(this.textureUrl ? WHITE : this.color);
-    if (t > 0) material.color.lerp(BLOOD_MOON, t).multiplyScalar(1 - 0.45 * t);
-    if (this.vegetation) {
-      this.vegetation.material.color.copy(WHITE);
-      if (t > 0) this.vegetation.material.color.lerp(BLOOD_MOON, t).multiplyScalar(1 - 0.45 * t);
-    }
-  }
-
-  private readonly shadowNormal = new THREE.Vector3();
-
   /**
-   * Eclipse de sol: sombra redonda de una luna sobre este planeta, en el punto
-   * que mira `normal` (desde el centro) y de radio `radius` (UA). null = sin sombra.
+   * Eclipse sobre este cuerpo: la sombra de una luna (eclipse de sol) o la del
+   * planeta sobre una luna (eclipse de luna). null = sin eclipse.
    */
-  setShadow(normal: { x: number; y: number; z: number } | null, radius = 0): void {
-    if (!normal) {
-      if (this.shadow) this.shadow.visible = false;
-      return;
+  setEclipse(shadow: EclipseShadow | null): void {
+    if (!shadow && !this.eclipse) return;
+    if (!this.eclipse) {
+      this.eclipse = new EclipseShell();
+      this.eclipse.mesh.renderOrder = SHADOW_ORDER;
+      // Fuera de la esfera para no girar con ella (la sombra depende de la luz, no del giro)
+      this.group.add(this.eclipse.mesh);
     }
-    if (!this.shadow) {
-      this.shadow = new THREE.Mesh(
-        new THREE.CircleGeometry(1, 48),
-        new THREE.MeshBasicMaterial({ color: 0x000000, alphaMap: shadowAlpha(), transparent: true, opacity: 0.82, depthWrite: false }),
-      );
-      this.shadow.renderOrder = SHADOW_ORDER;
-      // Fuera de la esfera para que no gire ni se achate con ella
-      this.group.add(this.shadow);
-    }
-    this.shadow.visible = true;
-    this.shadowNormal.set(normal.x, normal.y, normal.z).normalize();
-    this.shadow.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), this.shadowNormal);
-    this.shadow.scale.setScalar(radius);
+    this.eclipse.set(shadow);
   }
 
   /** Galaxia: nube de puntos en lugar de esfera (se rehace si cambia de forma). */
@@ -399,8 +354,7 @@ export class BodyView {
     this.beams?.dispose();
     this.blackHole?.dispose();
     this.galaxy?.dispose();
-    this.shadow?.geometry.dispose();
-    this.shadow?.material.dispose();
+    this.eclipse?.dispose();
     // La textura de vegetación es compartida (caché): solo se libera la esfera
     this.vegetation?.geometry.dispose();
     this.vegetation?.material.dispose();

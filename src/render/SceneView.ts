@@ -13,6 +13,7 @@ import { createStarfield } from './starfield';
 import { HabitableZoneView } from './HabitableZoneView';
 import { habitableZone } from '../life/habitability';
 import { computeEclipses, type Eclipses } from '../sim/eclipses';
+import type { EclipseShadow } from './EclipseShell';
 
 /** No se repite el aviso del mismo eclipse antes de este tiempo (ms) */
 const ECLIPSE_NOTICE_GAP_MS = 8000;
@@ -99,14 +100,13 @@ export class SceneView {
     }
     const refresh = this.frameCount++ % TRAIL_REFRESH_FRAMES === 0;
     const height = this.renderer.domElement.clientHeight;
-    const eclipses = this.eclipsesEnabled ? computeEclipses(world.bodies) : null;
-    if (eclipses) this.reportEclipseStarts(world, eclipses);
+    // Eventos: los avisos salen del cálculo de la simulación; el dibujo usa las
+    // posiciones de este fotograma para que las sombras se muevan sin saltos
+    if (this.eclipsesEnabled) this.reportEclipseStarts(world, computeEclipses(world.bodies));
+    const shadows = this.eclipsesEnabled ? this.eclipseShadows(world, alpha) : null;
     for (const b of world.bodies) {
       const view = this.views.get(b.id)!;
-      // Eventos: luna roja dentro de la sombra del planeta, y sombra de la luna sobre el planeta
-      view.eclipseRed = eclipses?.lunar.get(b.id) ?? 0;
-      const shadow = eclipses?.solar.find((s) => s.planetId === b.id);
-      view.setShadow(shadow ? shadow.normal : null, shadow?.radius);
+      view.setEclipse(shadows?.get(b.id) ?? null);
       if (refresh) this.applyTrailTiming(view, world, b);
       const center = this.trailCenter(world, b, anchors.length, starCenter, alpha);
       view.update(b, alpha, this.focus, center, world.time, this.camera, height, spinSeconds);
@@ -211,6 +211,64 @@ export class SceneView {
   onEclipseStart: ((kind: 'solar' | 'lunar', moon: string, planet: string) => void) | null = null;
   private activeEclipses = new Set<string>();
   private lastEclipseNotice = new Map<string, number>();
+
+  /**
+   * Sombras de eclipse a dibujar en este fotograma, en coordenadas de la escena:
+   * en cada luna, la sombra de su planeta (eclipse de luna); en cada planeta, la
+   * sombra de la luna que tiene delante de la estrella (eclipse de sol).
+   */
+  private eclipseShadows(world: World, alpha: number): Map<number, EclipseShadow> {
+    const out = new Map<number, EclipseShadow>();
+    const pos = new Map<number, Vec3>();
+    const at = (b: Body): Vec3 => {
+      let p = pos.get(b.id);
+      if (!p) {
+        const q = interpolated(b, alpha);
+        p = { x: q.x - this.focus.x, y: q.y - this.focus.y, z: q.z - this.focus.z };
+        pos.set(b.id, p);
+      }
+      return p;
+    };
+    // De dónde viene la luz: estrellas que alumbran, pesadas por su brillo
+    let l = 0;
+    const light = { x: 0, y: 0, z: 0 };
+    for (const s of world.bodies) {
+      if (s.kind !== 'star' || s.luminosity <= 0) continue;
+      const p = at(s);
+      l += s.luminosity;
+      light.x += p.x * s.luminosity; light.y += p.y * s.luminosity; light.z += p.z * s.luminosity;
+    }
+    if (l === 0) return out;
+    light.x /= l; light.y /= l; light.z /= l;
+    const dirFrom = (p: Vec3) => {
+      const d = { x: p.x - light.x, y: p.y - light.y, z: p.z - light.z };
+      const n = Math.hypot(d.x, d.y, d.z) || 1;
+      return { x: d.x / n, y: d.y / n, z: d.z / n };
+    };
+    const closest = new Map<number, number>();
+    for (const moon of world.bodies) {
+      if (moon.parentId === null) continue;
+      const planet = world.get(moon.parentId);
+      if (!planet) continue;
+      const pp = at(planet), mp = at(moon);
+      const rp = visualRadius(planet), rm = visualRadius(moon);
+      // Eclipse de luna: el planeta tapa la luz que llega a la luna
+      out.set(moon.id, { kind: 'lunar', occluder: pp, radius: rp, lightDir: dirFrom(pp) });
+      // Eclipse de sol: la luna tapa la luz que llega al planeta (solo si está delante)
+      const dir = dirFrom(mp);
+      const rel = { x: pp.x - mp.x, y: pp.y - mp.y, z: pp.z - mp.z };
+      const along = rel.x * dir.x + rel.y * dir.y + rel.z * dir.z;
+      if (along <= 0) continue;
+      const perp = Math.hypot(rel.x - along * dir.x, rel.y - along * dir.y, rel.z - along * dir.z);
+      if (perp > rp + rm * 1.4) continue;
+      // Si varias lunas tapan a la vez, se dibuja la más centrada
+      if (perp < (closest.get(planet.id) ?? Infinity)) {
+        closest.set(planet.id, perp);
+        out.set(planet.id, { kind: 'solar', occluder: mp, radius: rm, lightDir: dir });
+      }
+    }
+    return out;
+  }
 
   /** Detecta los eclipses que acaban de empezar (con un margen para no repetir avisos). */
   private reportEclipseStarts(world: World, e: Eclipses): void {
