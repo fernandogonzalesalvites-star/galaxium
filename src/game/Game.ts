@@ -371,12 +371,8 @@ export class Game implements InputHandlers {
 
   setEvents(on: boolean, announce = true): void {
     this.eventsOn = on;
+    // Los eclipses se ven en pantalla, sin avisos aparte
     this.view.eclipsesEnabled = on;
-    this.view.onEclipseStart = on
-      ? (kind, moon, planet) => this.hud.toast(kind === 'solar'
-        ? `🌑 Eclipse de sol: la sombra de ${moon} cae sobre ${planet}`
-        : `🔴 Eclipse de luna: ${moon} se puso roja en la sombra de ${planet}`)
-      : null;
     this.hud.setEventsOn(on);
     if (announce) {
       const hasMoons = this.world.bodies.some((b) => b.parentId !== null);

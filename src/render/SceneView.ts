@@ -12,11 +12,7 @@ import { GhostView } from './GhostView';
 import { createStarfield } from './starfield';
 import { HabitableZoneView } from './HabitableZoneView';
 import { habitableZone } from '../life/habitability';
-import { computeEclipses, type Eclipses } from '../sim/eclipses';
 import type { EclipseShadow } from './EclipseShell';
-
-/** No se repite el aviso del mismo eclipse antes de este tiempo (ms) */
-const ECLIPSE_NOTICE_GAP_MS = 8000;
 
 /** Radio mínimo (px) alrededor de un cuerpo que cuenta como tocarlo */
 const PICK_RADIUS_PX = 28;
@@ -100,9 +96,7 @@ export class SceneView {
     }
     const refresh = this.frameCount++ % TRAIL_REFRESH_FRAMES === 0;
     const height = this.renderer.domElement.clientHeight;
-    // Eventos: los avisos salen del cálculo de la simulación; el dibujo usa las
-    // posiciones de este fotograma para que las sombras se muevan sin saltos
-    if (this.eclipsesEnabled) this.reportEclipseStarts(world, computeEclipses(world.bodies));
+    // Eventos: las sombras usan las posiciones de este fotograma para moverse sin saltos
     const shadows = this.eclipsesEnabled ? this.eclipseShadows(world, alpha) : null;
     for (const b of world.bodies) {
       const view = this.views.get(b.id)!;
@@ -207,10 +201,6 @@ export class SceneView {
 
   /** Eventos activados: se dibujan los eclipses */
   eclipsesEnabled = false;
-  /** Avisa cuando empieza un eclipse (para mostrar un mensaje) */
-  onEclipseStart: ((kind: 'solar' | 'lunar', moon: string, planet: string) => void) | null = null;
-  private activeEclipses = new Set<string>();
-  private lastEclipseNotice = new Map<string, number>();
 
   /**
    * Sombras de eclipse a dibujar en este fotograma, en coordenadas de la escena:
@@ -270,27 +260,6 @@ export class SceneView {
     return out;
   }
 
-  /** Detecta los eclipses que acaban de empezar (con un margen para no repetir avisos). */
-  private reportEclipseStarts(world: World, e: Eclipses): void {
-    const now = new Set<string>();
-    const nowMs = performance.now();
-    const fire = (key: string, kind: 'solar' | 'lunar', moonId: number, planetId: number) => {
-      now.add(key);
-      if (this.activeEclipses.has(key)) return;
-      if (nowMs - (this.lastEclipseNotice.get(key) ?? -Infinity) < ECLIPSE_NOTICE_GAP_MS) return;
-      this.lastEclipseNotice.set(key, nowMs);
-      const moon = world.get(moonId), planet = world.get(planetId);
-      if (moon && planet) this.onEclipseStart?.(kind, moon.name, planet.name);
-    };
-    for (const s of e.solar) fire(`s${s.moonId}`, 'solar', s.moonId, s.planetId);
-    for (const [moonId, amount] of e.lunar) {
-      const moon = world.get(moonId);
-      // La luna roja se avisa cuando entra del todo en la sombra
-      if (moon && moon.parentId !== null && amount >= 0.99) fire(`l${moonId}`, 'lunar', moonId, moon.parentId);
-      else if (this.activeEclipses.has(`l${moonId}`)) now.add(`l${moonId}`);
-    }
-    this.activeEclipses = now;
-  }
 
   /** Quita todos los cuerpos dibujados (al salir de una partida o cargar otra). */
   clear(): void {
