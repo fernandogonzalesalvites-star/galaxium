@@ -14,7 +14,10 @@ import type { GalaxyType } from '../sim/galaxies';
 /** Intensidad de la luz de una estrella y del brillo del disco de un agujero negro */
 const STAR_LIGHT = 3;
 const BLACK_HOLE_LIGHT = 0.4;
-import { surfaceTexture } from './surfaceTextures';
+import { surfaceTexture, vegetationTexture } from './surfaceTextures';
+
+/** La capa de vegetación va un 0,4 % por encima de la superficie */
+const VEGETATION_LIFT = 1.004;
 
 const textureLoader = new THREE.TextureLoader();
 
@@ -49,6 +52,8 @@ export class BodyView {
   private beams: PulsarBeams | null = null;
   private blackHole: BlackHoleView | null = null;
   private galaxy: GalaxyView | null = null;
+  private vegetation: THREE.Mesh<THREE.SphereGeometry, THREE.MeshStandardMaterial> | null = null;
+  private vegetationSeed = 0;
   private galaxyType: GalaxyType | null = null;
   private ringKey = '';
   /** Data URL de la textura que se está mostrando (null = color liso) */
@@ -104,6 +109,7 @@ export class BodyView {
     this.syncBeams(b, dist);
     this.syncBlackHole(b, dist);
     this.syncGalaxy(b, time);
+    this.syncVegetation(b);
     // El agujero negro siempre se ve por su disco: el punto marcador lo taparía
     this.marker.visible = !this.blackHole && this.screenRadiusPx < MARKER_HIDE_PX;
     this.updateTrail(p, alpha, focus, center, time);
@@ -194,6 +200,41 @@ export class BodyView {
     }
   }
 
+  /**
+   * Vegetación: una capa verde y transparente apenas por encima de la superficie,
+   * para que se vea sobre cualquier textura o color. Se quita al poner 0.
+   */
+  private syncVegetation(b: Body): void {
+    const seed = b.kind === 'rocky' ? b.vegetation : 0;
+    if (seed === this.vegetationSeed) return;
+    this.vegetationSeed = seed;
+    if (!seed) {
+      if (this.vegetation) {
+        this.mesh.remove(this.vegetation);
+        this.vegetation.geometry.dispose();
+        this.vegetation.material.dispose();
+        this.vegetation = null;
+      }
+      return;
+    }
+    if (!this.vegetation) {
+      this.vegetation = new THREE.Mesh(
+        new THREE.SphereGeometry(VEGETATION_LIFT, 48, 32),
+        new THREE.MeshStandardMaterial({ transparent: true, depthWrite: false, roughness: 1, metalness: 0, opacity: 0 }),
+      );
+      // Hija de la esfera: hereda su tamaño
+      this.mesh.add(this.vegetation);
+    }
+    const material = this.vegetation.material;
+    void vegetationTexture(seed).then((tex) => {
+      // Si mientras se generaba se pidió otra vegetación (o se quitó), se ignora
+      if (this.vegetationSeed !== seed || !this.vegetation) return;
+      material.map = tex;
+      material.opacity = 1;
+      material.needsUpdate = true;
+    });
+  }
+
   /** Galaxia: nube de puntos en lugar de esfera (se rehace si cambia de forma). */
   private syncGalaxy(b: Body, time: number): void {
     const type = b.kind === 'galaxy' ? b.galaxyType ?? 'spiral' : null;
@@ -270,6 +311,9 @@ export class BodyView {
     this.beams?.dispose();
     this.blackHole?.dispose();
     this.galaxy?.dispose();
+    // La textura de vegetación es compartida (caché): solo se libera la esfera
+    this.vegetation?.geometry.dispose();
+    this.vegetation?.material.dispose();
     // Las texturas incluidas son compartidas: solo se libera una imagen propia
     if (this.ownsMap) this.mesh.material.map?.dispose();
     this.mesh.geometry.dispose();

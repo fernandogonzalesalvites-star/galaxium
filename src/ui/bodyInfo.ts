@@ -14,6 +14,11 @@ export interface BodyInfo {
   rows: [string, string][];
   /** Estado de habitabilidad, o null en las estrellas */
   status: { habitable: boolean; text: string } | null;
+  /**
+   * Vegetación: 'none' rocoso sin plantas, 'grown' rocoso con plantas,
+   * 'unavailable' gigante de gas o hielo (no crece), null si no es un planeta ni una luna.
+   */
+  vegetation?: 'none' | 'grown' | 'unavailable' | null;
 }
 
 export function kindLabel(body: Body): string {
@@ -79,11 +84,14 @@ export function describeBody(world: World, body: Body): BodyInfo {
     );
   }
   rows.push(['Temperatura', formatTemperature(h.temperature)], ['Atmósfera', formatPercent(body.atmosphere)]);
-  if (body.kind === 'rocky') rows.push(['Agua', formatPercent(body.water)]);
+  if (body.kind === 'rocky') {
+    rows.push(['Agua', formatPercent(body.water)], ['Vegetación', body.vegetation ? 'Sí' : 'No']);
+  }
   return {
     name: body.name,
     kindLabel: kindLabel(body),
     rows,
     status: { habitable: h.habitable, text: h.habitable ? 'Habitable' : `No habitable: ${h.reason!.toLowerCase()}` },
+    vegetation: body.kind === 'rocky' ? (body.vegetation ? 'grown' : 'none') : 'unavailable',
   };
 }

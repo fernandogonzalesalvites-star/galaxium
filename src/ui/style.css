@@ -50,6 +50,11 @@ button { font: inherit; color: inherit; }
 .hud-sheet-actions { display: flex; gap: 8px; }
 .hud-sheet-actions .hud-btn { flex: 1; }
 .hud-sheet-edit { background: rgba(60, 120, 255, 0.8); }
+.hud-sheet-veg { display: flex; flex-direction: column; gap: 6px; }
+.hud-veg { border-color: rgba(110, 231, 160, 0.45); background: rgba(30, 110, 60, 0.55); font-weight: 600; }
+.hud-veg:disabled { opacity: 0.45; cursor: not-allowed; }
+.hud-veg-remove { flex: 0 0 auto !important; }
+.hud-veg-note { font-size: 13px; opacity: 0.8; }
 .hud-placement-climate { font-weight: 600; min-height: 1.2em; }
 .hud-placement-climate[data-tone='good'] { color: #6ee7a0; }
 .hud-placement-climate[data-tone='bad'] { color: #9cc4ff; }

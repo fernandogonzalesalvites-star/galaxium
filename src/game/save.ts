@@ -53,6 +53,7 @@ export function snapshot(
       pulsar: b.pulsar,
       blackHole: b.blackHole,
       galaxyType: b.galaxyType,
+      vegetation: b.vegetation,
     })),
   };
 }
@@ -87,6 +88,8 @@ export function restoreWorld(data: SaveData): World {
       pulsar: b.pulsar ?? false,
       blackHole: b.blackHole ?? false,
       galaxyType: b.kind === 'galaxy' && isGalaxyType(b.galaxyType) ? b.galaxyType : b.kind === 'galaxy' ? 'spiral' : null,
+      // Las partidas de antes de la vegetación no la traen
+      vegetation: b.kind === 'rocky' && Number.isFinite(b.vegetation) ? b.vegetation : 0,
       // Las partidas de antes de las texturas incluidas reciben la de su tipo
       surface: isSurfaceStyle(b.surface) ? b.surface : defaultSurface(b.kind, b.parentId !== null),
       ax: 0, ay: 0, az: 0,

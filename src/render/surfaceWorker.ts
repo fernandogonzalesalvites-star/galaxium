@@ -1,7 +1,9 @@
-import { surfaceLuminance } from './surfaceMaps';
+import { surfaceLuminance, vegetationMap } from './surfaceMaps';
 import type { SurfaceStyle } from '../sim/surfaces';
 
-interface Request { key: string; style: SurfaceStyle; seed: number; width: number; height: number }
+type Request =
+  | { key: string; kind: 'surface'; style: SurfaceStyle; seed: number; width: number; height: number }
+  | { key: string; kind: 'vegetation'; seed: number; width: number; height: number };
 
 /** Lo mínimo del ámbito de un worker que se usa aquí (el proyecto compila con los tipos del navegador). */
 const scope = self as unknown as {
@@ -11,7 +13,9 @@ const scope = self as unknown as {
 
 /** Genera texturas en segundo plano para no congelar el juego. */
 scope.onmessage = (e) => {
-  const { key, style, seed, width, height } = e.data;
-  const data = surfaceLuminance(style, seed, width, height);
-  scope.postMessage({ key, data }, [data.buffer]);
+  const req = e.data;
+  const data = req.kind === 'vegetation'
+    ? vegetationMap(req.seed, req.width, req.height)
+    : surfaceLuminance(req.style, req.seed, req.width, req.height);
+  scope.postMessage({ key: req.key, data }, [data.buffer]);
 };

@@ -49,6 +49,8 @@ export interface Body {
   blackHole: boolean;
   /** Solo en el modo galaxias: forma de la galaxia */
   galaxyType: GalaxyType | null;
+  /** Vegetación de un cuerpo rocoso: 0 = no tiene; otro número = semilla del dibujo al azar */
+  vegetation: number;
 }
 
 export interface BodyInit {
@@ -69,4 +71,5 @@ export interface BodyInit {
   pulsar?: boolean;
   blackHole?: boolean;
   galaxyType?: GalaxyType | null;
+  vegetation?: number;
 }

@@ -37,6 +37,7 @@ export class World {
       pulsar: init.pulsar ?? false,
       blackHole: init.blackHole ?? false,
       galaxyType: init.galaxyType ?? null,
+      vegetation: init.vegetation ?? 0,
     };
     this.bodies.push(body);
     this.accelValid = false;

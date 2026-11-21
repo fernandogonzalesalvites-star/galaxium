@@ -146,3 +146,39 @@ export function surfaceLuminance(style: SurfaceStyle, seed: number, width: numbe
   }
   return out;
 }
+
+/**
+ * Manchas de vegetación (RGBA, fila 0 = polo sur) para poner encima del planeta:
+ * bosques oscuros, praderas más claras y zonas sin plantas (transparentes).
+ * Cuánto cubre cambia con la semilla: del 25 % al 60 % del planeta, menos en los polos.
+ */
+export function vegetationMap(seed: number, width: number, height: number): Uint8Array {
+  const out = new Uint8Array(width * height * 4);
+  const r = rng(seed);
+  const coverage = 0.25 + r() * 0.35;
+  // Umbral aproximado para cubrir esa fracción (el ruido se concentra alrededor de 0,5)
+  const level = 0.6 - coverage * 0.28;
+  const scale = 1.6 + r() * 1.6;
+  for (let j = 0; j < height; j++) {
+    const lat = ((j + 0.5) / height - 0.5) * Math.PI;
+    const cl = Math.cos(lat), y = Math.sin(lat);
+    // Hacia los polos hace frío: menos plantas
+    const cold = clamp01((Math.abs(y) - 0.7) / 0.2);
+    for (let i = 0; i < width; i++) {
+      const lon = ((i + 0.5) / width) * Math.PI * 2;
+      const x = cl * Math.cos(lon), z = cl * Math.sin(lon);
+      const n = fbm(x * scale, y * scale, z * scale, seed, 6);
+      const a = clamp01((n - level) / 0.035) * (1 - cold);
+      const shade = fbm(x * 7, y * 7, z * 7, seed + 11, 4);
+      const dry = fbm(x * 2.5, y * 2.5, z * 2.5, seed + 23, 3);
+      // Bosque (verde oscuro) ↔ pradera (verde claro) ↔ sabana (verde amarillento)
+      const g = 0.32 + 0.38 * shade;
+      const o = (j * width + i) * 4;
+      out[o] = Math.round(255 * clamp01(0.08 + 0.35 * dry * shade));
+      out[o + 1] = Math.round(255 * clamp01(g));
+      out[o + 2] = Math.round(255 * clamp01(0.06 + 0.1 * shade));
+      out[o + 3] = Math.round(255 * a * 0.92);
+    }
+  }
+  return out;
+}

@@ -15,6 +15,9 @@ export interface HudHandlers {
   onAddStar(type: SingleStarType): void;
   /** Añadir una galaxia (modo galaxias) */
   onAddGalaxy(type: GalaxyType): void;
+  /** Hacer crecer vegetación al azar en el planeta elegido (otra distinta si ya tenía) */
+  onVegetation(): void;
+  onRemoveVegetation(): void;
   onCancelPlacement(): void;
   onFrameSystem(): void;
   onEdit(): void;
@@ -44,6 +47,10 @@ export class Hud {
   private readonly sheetKind = el('span', 'hud-sheet-kind');
   private readonly sheetStatus = el('div', 'hud-sheet-status');
   private readonly sheetRows = el('dl', 'hud-sheet-rows');
+  private readonly vegBox = el('div', 'hud-sheet-veg hidden');
+  private readonly vegButton = el('button', 'hud-btn hud-veg');
+  private readonly vegRemove = el('button', 'hud-btn hud-veg-remove hidden', 'Quitar');
+  private readonly vegNote = el('span', 'hud-veg-note hidden', 'Solo crece en planetas rocosos');
   private readonly placementClimate = el('div', 'hud-placement-climate');
   private readonly placement = el('div', 'hud-placement hidden');
   private readonly placementHint = el('div', 'hud-placement-hint');
@@ -81,7 +88,15 @@ export class Hud {
     const follow = el('button', 'hud-btn', 'Seguir');
     follow.onclick = () => h.onFollow();
     sheetActions.append(edit, follow);
-    this.sheet.append(sheetHead, this.sheetStatus, this.sheetRows, sheetActions);
+
+    // Vegetación: solo en planetas y lunas rocosos
+    this.vegButton.innerHTML = '<span aria-hidden="true">🌿</span> Vegetación';
+    this.vegButton.onclick = () => h.onVegetation();
+    this.vegRemove.onclick = () => h.onRemoveVegetation();
+    const vegRow = el('div', 'hud-sheet-actions');
+    vegRow.append(this.vegButton, this.vegRemove);
+    this.vegBox.append(vegRow, this.vegNote);
+    this.sheet.append(sheetHead, this.sheetStatus, this.sheetRows, sheetActions, this.vegBox);
 
     const time = el('div', 'hud-time');
     SPEED_LEVELS.forEach((level, i) => {
@@ -197,6 +212,13 @@ export class Hud {
       return row;
     });
     this.sheetRows.replaceChildren(...rows);
+
+    const veg = info.vegetation ?? null;
+    this.vegBox.classList.toggle('hidden', veg === null);
+    // En gigantes de gas o hielo el botón se ve apagado y el texto dice por qué
+    this.vegButton.disabled = veg === 'unavailable';
+    this.vegRemove.classList.toggle('hidden', veg !== 'grown');
+    this.vegNote.classList.toggle('hidden', veg !== 'unavailable');
   }
 
   openEditor(model: EditorModel, handlers: EditorHandlers): void {

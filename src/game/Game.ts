@@ -22,6 +22,7 @@ import {
 } from './editing';
 import { restoreWorld, snapshot, type SaveData } from './save';
 import { createDemoSystem } from './demo';
+import { canGrowVegetation, growVegetation, removeVegetation } from './vegetation';
 import type { Universe } from './save';
 import {
   applyGalaxyType, checkGalaxyPlacement, createGalaxyUniverse, galaxies, GALAXY_SPECS, MAX_GALAXIES, mergeGalaxies,
@@ -346,6 +347,30 @@ export class Game implements InputHandlers {
   }
 
   // ── Ficha y editor ─────────────────────────────────────────
+
+  /** Hace crecer vegetación al azar en el planeta o luna elegido (solo rocosos). */
+  vegetationSelected(): void {
+    if (this.selectedId === null || this.mode.kind !== 'idle') return;
+    const body = this.world.get(this.selectedId);
+    if (!body) return;
+    if (!canGrowVegetation(body)) {
+      this.hud.toast('La vegetación solo crece en planetas rocosos');
+      return;
+    }
+    const had = body.vegetation !== 0;
+    growVegetation(body);
+    this.hud.toast(had ? `🌿 Nueva vegetación en ${body.name}` : `🌿 Creció vegetación en ${body.name}`);
+    this.refreshInfo();
+  }
+
+  removeVegetationSelected(): void {
+    if (this.selectedId === null || this.mode.kind !== 'idle') return;
+    const body = this.world.get(this.selectedId);
+    if (!body || !body.vegetation) return;
+    removeVegetation(body);
+    this.hud.toast(`Se quitó la vegetación de ${body.name}`);
+    this.refreshInfo();
+  }
 
   followSelected(): void {
     if (this.selectedId !== null && this.mode.kind === 'idle') this.view.follow(this.selectedId, this.world);
