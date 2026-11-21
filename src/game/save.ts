@@ -56,6 +56,7 @@ export function snapshot(
       galaxyType: b.galaxyType,
       vegetation: b.vegetation,
       dayHours: b.dayHours,
+      clouds: b.clouds,
     })),
   };
 }
@@ -94,6 +95,8 @@ export function restoreWorld(data: SaveData): World {
       vegetation: b.kind === 'rocky' && Number.isFinite(b.vegetation) ? b.vegetation : 0,
       // Las partidas de antes de la rotación reciben el día de su tipo
       dayHours: Number.isFinite(b.dayHours) && b.dayHours >= 0 ? b.dayHours : defaultDayHours(b.kind, b.parentId !== null),
+      // Las partidas de antes de las nubes no las traen
+      clouds: Number.isFinite(b.clouds) ? b.clouds : 0,
       // Las partidas de antes de las texturas incluidas reciben la de su tipo
       surface: isSurfaceStyle(b.surface) ? b.surface : defaultSurface(b.kind, b.parentId !== null),
       ax: 0, ay: 0, az: 0,

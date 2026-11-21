@@ -148,6 +148,42 @@ export function surfaceLuminance(style: SurfaceStyle, seed: number, width: numbe
 }
 
 /**
+ * Nubes (RGBA, fila 0 = polo sur): blancas, con remolinos (el ruido se
+ * retuerce) y estiradas en franjas este-oeste como en la Tierra. Cuánto cielo
+ * cubren cambia con la semilla: del 30 % al 65 %.
+ */
+export function cloudMap(seed: number, width: number, height: number): Uint8Array {
+  const out = new Uint8Array(width * height * 4);
+  const r = rng(seed + 77);
+  const coverage = 0.3 + r() * 0.35;
+  const level = 0.6 - coverage * 0.22;
+  const scale = 2.2 + r() * 1.6;
+  for (let j = 0; j < height; j++) {
+    const lat = ((j + 0.5) / height - 0.5) * Math.PI;
+    const cl = Math.cos(lat), y = Math.sin(lat);
+    for (let i = 0; i < width; i++) {
+      const lon = ((i + 0.5) / width) * Math.PI * 2;
+      const x = cl * Math.cos(lon), z = cl * Math.sin(lon);
+      // Remolinos: el punto se desplaza según otro ruido antes de mirar el principal
+      const wx = fbm(x * 1.5, y * 1.5, z * 1.5, seed + 5, 3) - 0.5;
+      const wz = fbm(x * 1.5 + 9, y * 1.5, z * 1.5, seed + 6, 3) - 0.5;
+      // Estiradas en franjas: más detalle norte-sur que este-oeste
+      let n = fbm((x + wx * 1.4) * scale, y * scale * 3, (z + wz * 1.4) * scale, seed, 6);
+      // Hilachas finas en los bordes
+      n += 0.12 * (fbm(x * scale * 4, y * scale * 9, z * scale * 4, seed + 13, 3) - 0.5);
+      // Borde suave: pasa de transparente a nube en un tramo ancho
+      const a = clamp01((n - level) / 0.17);
+      const o = (j * width + i) * 4;
+      // Algo más grises por debajo de las nubes gruesas
+      const shade = 0.86 + 0.14 * a;
+      out[o] = out[o + 1] = out[o + 2] = Math.round(255 * shade);
+      out[o + 3] = Math.round(255 * Math.pow(a, 1.6) * 0.78);
+    }
+  }
+  return out;
+}
+
+/**
  * Manchas de vegetación (RGBA, fila 0 = polo sur) para poner encima del planeta:
  * bosques oscuros, praderas más claras y zonas sin plantas (transparentes).
  * Cuánto cubre cambia con la semilla: del 25 % al 60 % del planeta, menos en los polos.

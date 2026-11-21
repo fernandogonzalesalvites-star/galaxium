@@ -55,6 +55,8 @@ button { font: inherit; color: inherit; }
 .hud-sheet-veg { display: flex; flex-direction: column; gap: 6px; }
 .hud-veg { border-color: rgba(110, 231, 160, 0.45); background: rgba(30, 110, 60, 0.55); font-weight: 600; }
 .hud-veg:disabled { opacity: 0.45; cursor: not-allowed; }
+.hud-clouds { font-weight: 600; border-color: rgba(220, 230, 255, 0.45); background: rgba(90, 110, 150, 0.5); }
+.hud-clouds:disabled { opacity: 0.45; cursor: not-allowed; }
 .hud-veg-remove { flex: 0 0 auto !important; }
 .hud-veg-note { font-size: 13px; opacity: 0.8; }
 /* Botón mediano, centrado debajo de los demás */

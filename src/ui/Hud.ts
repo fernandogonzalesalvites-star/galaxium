@@ -26,6 +26,9 @@ export interface HudHandlers {
   onToggleEvents(): void;
   /** Abrir la ventana para lanzar un proyectil contra el planeta elegido */
   onLaunch(): void;
+  /** Añadir nubes al azar al planeta elegido (otras distintas si ya tenía) */
+  onClouds(): void;
+  onRemoveClouds(): void;
   onCancelPlacement(): void;
   onFrameSystem(): void;
   onEdit(): void;
@@ -62,6 +65,9 @@ export class Hud {
   private readonly rotButton = el('button', 'hud-btn hud-rot hidden');
   private readonly eventsButton = el('button', 'hud-btn hud-events');
   private readonly launchButton = el('button', 'hud-btn hud-launch');
+  private readonly cloudButton = el('button', 'hud-btn hud-clouds');
+  private readonly cloudRemove = el('button', 'hud-btn hud-veg-remove hidden', 'Quitar');
+  private readonly cloudNote = el('span', 'hud-veg-note hidden', 'Necesita atmósfera para tener nubes');
   private readonly placementClimate = el('div', 'hud-placement-climate');
   private readonly placement = el('div', 'hud-placement hidden');
   private readonly placementHint = el('div', 'hud-placement-hint');
@@ -115,7 +121,15 @@ export class Hud {
     // Lanzar: botón mediano debajo, para tirarle un asteroide o un planeta rocoso
     this.launchButton.innerHTML = '<span aria-hidden="true">☄️</span> Lanzar';
     this.launchButton.onclick = () => h.onLaunch();
-    this.vegBox.append(vegRow, this.vegNote, this.launchButton);
+    // Nubes: se añaden al azar; «Quitar» al lado; apagado si no hay atmósfera
+    this.cloudButton.innerHTML = '<span aria-hidden="true">☁️</span> Añadir nubes';
+    this.cloudButton.onclick = () => h.onClouds();
+    this.cloudRemove.onclick = () => h.onRemoveClouds();
+    this.cloudRemove.setAttribute('aria-label', 'Quitar nubes');
+    this.vegRemove.setAttribute('aria-label', 'Quitar vegetación');
+    const cloudRow = el('div', 'hud-sheet-actions');
+    cloudRow.append(this.cloudButton, this.cloudRemove);
+    this.vegBox.append(vegRow, this.vegNote, cloudRow, this.cloudNote, this.launchButton);
     // Rotación: abre una edición solo para la duración del día
     this.rotButton.innerHTML = '<span aria-hidden="true">⟳</span> Rotación';
     this.rotButton.onclick = () => h.onRotation();
@@ -251,6 +265,10 @@ export class Hud {
     this.vegRemove.classList.toggle('hidden', veg !== 'grown');
     this.vegNote.classList.toggle('hidden', veg !== 'unavailable');
     this.rotButton.classList.toggle('hidden', !info.canRotate);
+    const clouds = info.clouds ?? null;
+    this.cloudButton.disabled = clouds === 'unavailable';
+    this.cloudRemove.classList.toggle('hidden', clouds !== 'added');
+    this.cloudNote.classList.toggle('hidden', clouds !== 'unavailable');
   }
 
   openEditor(model: EditorModel, handlers: EditorHandlers): void {

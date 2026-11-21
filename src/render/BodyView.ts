@@ -14,7 +14,7 @@ import type { GalaxyType } from '../sim/galaxies';
 /** Intensidad de la luz de una estrella y del brillo del disco de un agujero negro */
 const STAR_LIGHT = 3;
 const BLACK_HOLE_LIGHT = 0.4;
-import { surfaceTexture, vegetationTexture } from './surfaceTextures';
+import { cloudTexture, surfaceTexture, vegetationTexture } from './surfaceTextures';
 import { flattening } from '../sim/rotation';
 import { EclipseShell, type EclipseShadow } from './EclipseShell';
 import { CraterView, DebrisBurst } from './ImpactViews';
@@ -32,6 +32,11 @@ const SHADOW_ORDER = 2;
 const RING_ORDER = 3;
 /** Cráteres: sobre la vegetación y bajo la sombra de los eclipses */
 const CRATER_ORDER = 1.5;
+/** Nubes: por encima de vegetación y cráteres, a un 1,2 % de la superficie */
+const CLOUD_ORDER = 1.7;
+const CLOUD_LIFT = 1.012;
+/** Las nubes se desplazan sobre la superficie: radianes por segundo, además del giro del planeta */
+const CLOUD_DRIFT = 0.06;
 const MAX_CRATERS = 6;
 /** La capa de los eclipses va un 0,6 % por encima de la superficie (sobre la vegetación) */
 const ECLIPSE_LIFT = 1.006;
@@ -69,6 +74,8 @@ export class BodyView {
   private beams: PulsarBeams | null = null;
   private blackHole: BlackHoleView | null = null;
   private galaxy: GalaxyView | null = null;
+  private clouds: THREE.Mesh<THREE.SphereGeometry, THREE.MeshStandardMaterial> | null = null;
+  private cloudSeed = 0;
   private vegetation: THREE.Mesh<THREE.SphereGeometry, THREE.MeshStandardMaterial> | null = null;
   private vegetationSeed = 0;
   /** Capa donde se dibuja la sombra de un eclipse (se crea la primera vez que hace falta) */
@@ -137,6 +144,7 @@ export class BodyView {
     this.syncBlackHole(b, dist);
     this.syncGalaxy(b, time);
     this.syncVegetation(b);
+    this.syncClouds(b, spinSeconds);
     this.ageImpacts(spinSeconds);
     // La capa del eclipse sigue la forma de la esfera (también si está achatada), sin girar con ella
     if (this.eclipse) this.eclipse.mesh.scale.copy(this.mesh.scale).multiplyScalar(ECLIPSE_LIFT);
@@ -322,6 +330,47 @@ export class BodyView {
     this.eclipse.set(shadow);
   }
 
+  /**
+   * Nubes: una capa blanca y transparente algo por encima de la superficie.
+   * Gira con el planeta y además se desplaza despacio, como el viento.
+   */
+  private syncClouds(b: Body, dt: number): void {
+    const seed = b.kind === 'star' || b.kind === 'galaxy' ? 0 : b.clouds;
+    if (seed !== this.cloudSeed) {
+      this.cloudSeed = seed;
+      if (!seed) {
+        if (this.clouds) {
+          this.mesh.remove(this.clouds);
+          this.clouds.geometry.dispose();
+          this.clouds.material.dispose();
+          this.clouds = null;
+        }
+        return;
+      }
+      if (!this.clouds) {
+        this.clouds = new THREE.Mesh(
+          new THREE.SphereGeometry(CLOUD_LIFT, 48, 32),
+          new THREE.MeshStandardMaterial({ transparent: true, depthWrite: false, roughness: 1, metalness: 0, opacity: 0 }),
+        );
+        this.clouds.renderOrder = CLOUD_ORDER;
+        // Hija de la esfera: gira y se achata con ella
+        this.mesh.add(this.clouds);
+      }
+      const material = this.clouds.material;
+      material.opacity = 0;
+      void cloudTexture(seed).then((tex) => {
+        if (this.cloudSeed !== seed || !this.clouds) return;
+        material.map = tex;
+        material.needsUpdate = true;
+      });
+    }
+    if (!this.clouds) return;
+    const material = this.clouds.material;
+    // Aparecen poco a poco (en ~1,5 s) cuando la textura está lista
+    if (material.map && material.opacity < 1) material.opacity = Math.min(1, material.opacity + Math.max(dt, 1 / 60) / 1.5);
+    this.clouds.rotation.y += CLOUD_DRIFT * dt;
+  }
+
   /** Galaxia: nube de puntos en lugar de esfera (se rehace si cambia de forma). */
   private syncGalaxy(b: Body, time: number): void {
     const type = b.kind === 'galaxy' ? b.galaxyType ?? 'spiral' : null;
@@ -406,6 +455,8 @@ export class BodyView {
     // La textura de vegetación es compartida (caché): solo se libera la esfera
     this.vegetation?.geometry.dispose();
     this.vegetation?.material.dispose();
+    this.clouds?.geometry.dispose();
+    this.clouds?.material.dispose();
     // Las texturas incluidas son compartidas: solo se libera una imagen propia
     if (this.ownsMap) this.mesh.material.map?.dispose();
     this.mesh.geometry.dispose();

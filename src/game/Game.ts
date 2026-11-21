@@ -22,7 +22,9 @@ import {
 } from './editing';
 import { restoreWorld, snapshot, type SaveData } from './save';
 import { createDemoSystem } from './demo';
-import { canGrowVegetation, growVegetation, removeVegetation } from './vegetation';
+import {
+  addClouds, canGrowVegetation, canHaveClouds, growVegetation, removeClouds, removeVegetation,
+} from './vegetation';
 import { canRotate, formatDayHours } from '../sim/rotation';
 import { mergeCollisions, type Impact } from '../sim/collisions';
 import { LAUNCH_DISTANCE, launchProjectile } from '../sim/projectiles';
@@ -464,6 +466,30 @@ export class Game implements InputHandlers {
         onCancel: () => this.exitMode(),
       },
     );
+  }
+
+  /** Añade nubes al azar al planeta o luna elegido (solo si tiene atmósfera). */
+  cloudsSelected(): void {
+    if (this.selectedId === null || this.mode.kind !== 'idle') return;
+    const body = this.world.get(this.selectedId);
+    if (!body) return;
+    if (!canHaveClouds(body)) {
+      this.hud.toast('Necesita atmósfera para tener nubes');
+      return;
+    }
+    const had = body.clouds !== 0;
+    addClouds(body);
+    this.hud.toast(had ? `☁️ Nuevas nubes en ${body.name}` : `☁️ Aparecieron nubes en ${body.name}`);
+    this.refreshInfo();
+  }
+
+  removeCloudsSelected(): void {
+    if (this.selectedId === null || this.mode.kind !== 'idle') return;
+    const body = this.world.get(this.selectedId);
+    if (!body || !body.clouds) return;
+    removeClouds(body);
+    this.hud.toast(`Se quitaron las nubes de ${body.name}`);
+    this.refreshInfo();
   }
 
   removeVegetationSelected(): void {

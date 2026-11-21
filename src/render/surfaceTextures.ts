@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { SurfaceStyle } from '../sim/surfaces';
-import { surfaceLuminance, vegetationMap } from './surfaceMaps';
+import { cloudMap, surfaceLuminance, vegetationMap } from './surfaceMaps';
 
 const WIDTH = 512;
 const HEIGHT = 256;
@@ -32,23 +32,32 @@ function generate(key: string, style: SurfaceStyle, seed: number): Promise<Uint8
   });
 }
 
-const vegetationCache = new Map<number, Promise<THREE.DataTexture>>();
+const layerCache = new Map<string, Promise<THREE.DataTexture>>();
 
 /**
  * Capa de vegetación (verde con transparencia) para poner sobre el planeta.
  * Se genera en segundo plano; misma semilla, mismo dibujo. No liberar: es compartida.
  */
 export function vegetationTexture(seed: number): Promise<THREE.DataTexture> {
-  let p = vegetationCache.get(seed);
+  return layerTexture('vegetation', seed);
+}
+
+/** Capa de nubes (blanca con transparencia). Compartida: no liberar. */
+export function cloudTexture(seed: number): Promise<THREE.DataTexture> {
+  return layerTexture('clouds', seed);
+}
+
+function layerTexture(kind: 'vegetation' | 'clouds', seed: number): Promise<THREE.DataTexture> {
+  const key = `${kind}:${seed}`;
+  let p = layerCache.get(key);
   if (!p) {
-    const key = `veg:${seed}`;
     const w = getWorker();
     const data: Promise<Uint8Array> = w
       ? new Promise((resolve) => {
         pending.set(key, resolve);
-        w.postMessage({ key, kind: 'vegetation', seed, width: WIDTH, height: HEIGHT });
+        w.postMessage({ key, kind, seed, width: WIDTH, height: HEIGHT });
       })
-      : Promise.resolve(vegetationMap(seed, WIDTH, HEIGHT));
+      : Promise.resolve((kind === 'clouds' ? cloudMap : vegetationMap)(seed, WIDTH, HEIGHT));
     p = data.then((rgba) => {
       const tex = new THREE.DataTexture(rgba, WIDTH, HEIGHT);
       tex.colorSpace = THREE.SRGBColorSpace;
@@ -59,7 +68,7 @@ export function vegetationTexture(seed: number): Promise<THREE.DataTexture> {
       tex.needsUpdate = true;
       return tex;
     });
-    vegetationCache.set(seed, p);
+    layerCache.set(key, p);
   }
   return p;
 }

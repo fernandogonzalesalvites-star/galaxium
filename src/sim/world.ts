@@ -40,6 +40,7 @@ export class World {
       galaxyType: init.galaxyType ?? null,
       vegetation: init.vegetation ?? 0,
       dayHours: init.dayHours ?? defaultDayHours(init.kind, (init.parentId ?? null) !== null),
+      clouds: init.clouds ?? 0,
     };
     this.bodies.push(body);
     this.accelValid = false;

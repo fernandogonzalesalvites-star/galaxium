@@ -22,6 +22,8 @@ export interface BodyInfo {
   vegetation?: 'none' | 'grown' | 'unavailable' | null;
   /** Se le puede cambiar la rotación (planetas y lunas) */
   canRotate?: boolean;
+  /** Nubes: 'none' sin nubes, 'added' con nubes, 'unavailable' sin atmósfera; null si no es planeta ni luna */
+  clouds?: 'none' | 'added' | 'unavailable' | null;
 }
 
 export function kindLabel(body: Body): string {
@@ -103,5 +105,6 @@ export function describeBody(world: World, body: Body): BodyInfo {
     status: { habitable: h.habitable, text: h.habitable ? 'Habitable' : `No habitable: ${h.reason!.toLowerCase()}` },
     vegetation: body.kind === 'rocky' ? (body.vegetation ? 'grown' : 'none') : 'unavailable',
     canRotate: true,
+    clouds: body.atmosphere > 0 ? (body.clouds ? 'added' : 'none') : 'unavailable',
   };
 }

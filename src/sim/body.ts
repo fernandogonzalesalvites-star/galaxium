@@ -53,6 +53,8 @@ export interface Body {
   vegetation: number;
   /** Duración del día en horas (planetas y lunas; 0 = no gira). En pantalla, 1 hora = 1 segundo */
   dayHours: number;
+  /** Nubes: 0 = no tiene; otro número = semilla del dibujo al azar */
+  clouds: number;
 }
 
 export interface BodyInit {
@@ -75,4 +77,5 @@ export interface BodyInit {
   galaxyType?: GalaxyType | null;
   vegetation?: number;
   dayHours?: number;
+  clouds?: number;
 }
