@@ -27,6 +27,8 @@ button { font: inherit; color: inherit; }
 .hud-elapsed { flex: 1; opacity: 0.75; font-variant-numeric: tabular-nums; }
 .hud-frame { font-size: 22px; }
 .hud-menu { font-size: 18px; }
+.hud-events { font-weight: 600; white-space: nowrap; }
+.hud-events.active { background: rgba(80, 140, 255, 0.6); border-color: rgba(160, 200, 255, 0.9); }
 .hud button, .hud-sheet { pointer-events: auto; }
 .hud-sheet {
   position: absolute; top: 72px; left: 12px; width: min(340px, calc(100vw - 24px));

@@ -366,6 +366,30 @@ export class Game implements InputHandlers {
     this.refreshInfo();
   }
 
+  /** Eventos (eclipses) activados. Se recuerda en el dispositivo entre partidas. */
+  eventsOn = false;
+
+  setEvents(on: boolean, announce = true): void {
+    this.eventsOn = on;
+    this.view.eclipsesEnabled = on;
+    this.view.onEclipseStart = on
+      ? (kind, moon, planet) => this.hud.toast(kind === 'solar'
+        ? `🌑 Eclipse de sol: la sombra de ${moon} cae sobre ${planet}`
+        : `🔴 Eclipse de luna: ${moon} se puso roja en la sombra de ${planet}`)
+      : null;
+    this.hud.setEventsOn(on);
+    if (announce) {
+      const hasMoons = this.world.bodies.some((b) => b.parentId !== null);
+      this.hud.toast(on
+        ? hasMoons ? 'Eventos activados: eclipses de sol y de luna' : 'Eventos activados. Añade una luna para ver eclipses'
+        : 'Eventos desactivados');
+    }
+  }
+
+  toggleEvents(): void {
+    this.setEvents(!this.eventsOn);
+  }
+
   /** Abre la edición de la rotación del planeta o luna elegido. El juego queda en pausa mientras. */
   editRotationSelected(): void {
     if (this.selectedId === null || this.mode.kind !== 'idle') return;

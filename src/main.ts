@@ -11,6 +11,9 @@ import { watchForUpdates } from './updates';
 
 setupPwa();
 
+/** Preferencia «Eventos» (eclipses) guardada en el dispositivo */
+const EVENTS_KEY = 'galaxium-eventos';
+
 /** Cada cuánto se guarda sola la partida (ms) */
 const AUTOSAVE_MS = 20_000;
 
@@ -25,6 +28,15 @@ const hud = new Hud(app, {
   onVegetation: () => game.vegetationSelected(),
   onRemoveVegetation: () => game.removeVegetationSelected(),
   onRotation: () => game.editRotationSelected(),
+  onToggleEvents: () => {
+    game.toggleEvents();
+    // Se recuerda en este dispositivo para la próxima vez
+    try {
+      localStorage.setItem(EVENTS_KEY, game.eventsOn ? '1' : '0');
+    } catch {
+      // Sin almacenamiento (modo privado): solo dura esta sesión
+    }
+  },
   onCancelPlacement: () => game.cancelPlacement(),
   onFrameSystem: () => game.frameSystem(),
   onEdit: () => game.editSelected(),
@@ -35,6 +47,15 @@ const hud = new Hud(app, {
 const input = new TouchInput(game);
 input.attach(view.renderer.domElement);
 game.attach(hud, input);
+game.setEvents(readEventsSetting(), false);
+
+function readEventsSetting(): boolean {
+  try {
+    return localStorage.getItem(EVENTS_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
 
 // ── Partidas ─────────────────────────────────────────────────
 /** Partida con nombre en la que se está jugando (null = aún sin guardar) */

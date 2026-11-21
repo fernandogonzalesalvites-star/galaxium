@@ -12,6 +12,10 @@ import { GhostView } from './GhostView';
 import { createStarfield } from './starfield';
 import { HabitableZoneView } from './HabitableZoneView';
 import { habitableZone } from '../life/habitability';
+import { computeEclipses, type Eclipses } from '../sim/eclipses';
+
+/** No se repite el aviso del mismo eclipse antes de este tiempo (ms) */
+const ECLIPSE_NOTICE_GAP_MS = 8000;
 
 /** Radio mínimo (px) alrededor de un cuerpo que cuenta como tocarlo */
 const PICK_RADIUS_PX = 28;
@@ -95,8 +99,14 @@ export class SceneView {
     }
     const refresh = this.frameCount++ % TRAIL_REFRESH_FRAMES === 0;
     const height = this.renderer.domElement.clientHeight;
+    const eclipses = this.eclipsesEnabled ? computeEclipses(world.bodies) : null;
+    if (eclipses) this.reportEclipseStarts(world, eclipses);
     for (const b of world.bodies) {
       const view = this.views.get(b.id)!;
+      // Eventos: luna roja dentro de la sombra del planeta, y sombra de la luna sobre el planeta
+      view.eclipseRed = eclipses?.lunar.get(b.id) ?? 0;
+      const shadow = eclipses?.solar.find((s) => s.planetId === b.id);
+      view.setShadow(shadow ? shadow.normal : null, shadow?.radius);
       if (refresh) this.applyTrailTiming(view, world, b);
       const center = this.trailCenter(world, b, anchors.length, starCenter, alpha);
       view.update(b, alpha, this.focus, center, world.time, this.camera, height, spinSeconds);
@@ -193,6 +203,35 @@ export class SceneView {
     offset.setLength(distance);
     this.controls.target.set(0, 0, 0);
     this.camera.position.copy(offset);
+  }
+
+  /** Eventos activados: se dibujan los eclipses */
+  eclipsesEnabled = false;
+  /** Avisa cuando empieza un eclipse (para mostrar un mensaje) */
+  onEclipseStart: ((kind: 'solar' | 'lunar', moon: string, planet: string) => void) | null = null;
+  private activeEclipses = new Set<string>();
+  private lastEclipseNotice = new Map<string, number>();
+
+  /** Detecta los eclipses que acaban de empezar (con un margen para no repetir avisos). */
+  private reportEclipseStarts(world: World, e: Eclipses): void {
+    const now = new Set<string>();
+    const nowMs = performance.now();
+    const fire = (key: string, kind: 'solar' | 'lunar', moonId: number, planetId: number) => {
+      now.add(key);
+      if (this.activeEclipses.has(key)) return;
+      if (nowMs - (this.lastEclipseNotice.get(key) ?? -Infinity) < ECLIPSE_NOTICE_GAP_MS) return;
+      this.lastEclipseNotice.set(key, nowMs);
+      const moon = world.get(moonId), planet = world.get(planetId);
+      if (moon && planet) this.onEclipseStart?.(kind, moon.name, planet.name);
+    };
+    for (const s of e.solar) fire(`s${s.moonId}`, 'solar', s.moonId, s.planetId);
+    for (const [moonId, amount] of e.lunar) {
+      const moon = world.get(moonId);
+      // La luna roja se avisa cuando entra del todo en la sombra
+      if (moon && moon.parentId !== null && amount >= 0.99) fire(`l${moonId}`, 'lunar', moonId, moon.parentId);
+      else if (this.activeEclipses.has(`l${moonId}`)) now.add(`l${moonId}`);
+    }
+    this.activeEclipses = now;
   }
 
   /** Quita todos los cuerpos dibujados (al salir de una partida o cargar otra). */

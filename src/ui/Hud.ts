@@ -21,6 +21,8 @@ export interface HudHandlers {
   onRemoveVegetation(): void;
   /** Abrir la edición de la rotación (duración del día) del planeta elegido */
   onRotation(): void;
+  /** Activar o apagar los eventos (eclipses) */
+  onToggleEvents(): void;
   onCancelPlacement(): void;
   onFrameSystem(): void;
   onEdit(): void;
@@ -55,6 +57,7 @@ export class Hud {
   private readonly vegRemove = el('button', 'hud-btn hud-veg-remove hidden', 'Quitar');
   private readonly vegNote = el('span', 'hud-veg-note hidden', 'Solo crece en planetas rocosos');
   private readonly rotButton = el('button', 'hud-btn hud-rot hidden');
+  private readonly eventsButton = el('button', 'hud-btn hud-events');
   private readonly placementClimate = el('div', 'hud-placement-climate');
   private readonly placement = el('div', 'hud-placement hidden');
   private readonly placementHint = el('div', 'hud-placement-hint');
@@ -73,7 +76,12 @@ export class Hud {
     menuButton.title = 'Guardar partida';
     menuButton.setAttribute('aria-label', 'Guardar partida');
     menuButton.onclick = () => h.onGameMenu();
-    top.append(this.systemName, this.elapsed, menuButton, frameButton);
+    // Eventos: activa o apaga los eclipses (el botón se ilumina cuando están activos)
+    this.eventsButton.innerHTML = '<span aria-hidden="true">🌗</span> Eventos';
+    this.eventsButton.title = 'Eventos: eclipses de sol y de luna';
+    this.eventsButton.setAttribute('aria-pressed', 'false');
+    this.eventsButton.onclick = () => h.onToggleEvents();
+    top.append(this.systemName, this.elapsed, this.eventsButton, menuButton, frameButton);
 
     const cancel = el('button', 'hud-btn', 'Cancelar');
     cancel.onclick = () => h.onCancelPlacement();
@@ -172,9 +180,17 @@ export class Hud {
   private galaxyColumn: HTMLElement | null = null;
   private universe: Universe = 'stars';
 
+  /** Muestra si los eventos (eclipses) están activados. */
+  setEventsOn(on: boolean): void {
+    this.eventsButton.classList.toggle('active', on);
+    this.eventsButton.setAttribute('aria-pressed', String(on));
+  }
+
   /** Cambia el menú «＋» y las unidades de tiempo según el modo de juego. */
   setUniverse(universe: Universe): void {
     this.universe = universe;
+    // En el modo galaxias no hay lunas: no hay eclipses
+    this.eventsButton.classList.toggle('hidden', universe === 'galaxies');
     for (const c of this.solarColumns) c.classList.toggle('hidden', universe === 'galaxies');
     this.galaxyColumn?.classList.toggle('hidden', universe !== 'galaxies');
     this.lastTextUpdate = -Infinity;
