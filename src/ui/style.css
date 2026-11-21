@@ -183,31 +183,49 @@ button { font: inherit; color: inherit; }
 /* Al elegir partida o estrella se oscurece para leer mejor */
 .start-screen.choosing { background-color: rgba(3, 5, 14, 0.72); }
 .start-header { flex: none; }
-/* «GALAXIUM» grande y «SIMULATOR» debajo, arriba a la izquierda */
+/* Estilo «Cine»: «GALAXIUM» enorme y fino, «SIMULATOR» muy espaciado, arriba a la izquierda */
+.start-header, .start-menu, .start-choose { position: relative; z-index: 1; }
 .start-title {
   display: inline-flex; flex-direction: column; line-height: 0.95; text-transform: uppercase;
-  filter: drop-shadow(0 0 18px rgba(140, 170, 255, 0.35));
+  color: #f4f6ff; text-shadow: 0 0 28px rgba(140, 170, 255, 0.35);
 }
-.start-title-main, .start-title-sub {
-  background: linear-gradient(90deg, #fff4d6, #9cc4ff 70%, #c9a8ff); -webkit-background-clip: text; background-clip: text; color: transparent;
-}
-.start-title-main { font-size: clamp(44px, 9vw, 92px); font-weight: 900; letter-spacing: 0.04em; }
-.start-title-sub { font-size: clamp(18px, 3.6vw, 36px); font-weight: 700; letter-spacing: 0.42em; margin-top: 4px; }
+.start-title-main { font-size: clamp(44px, 9.5vw, 104px); font-weight: 300; letter-spacing: 0.14em; }
+.start-title-sub { font-size: clamp(14px, 2.6vw, 26px); font-weight: 400; letter-spacing: 0.62em; margin-top: 10px; color: #a9bbe6; }
 /* Al elegir partida o estrella el título se encoge para dejar sitio */
 .start-screen.choosing .start-title-main { font-size: clamp(28px, 5vw, 44px); }
 .start-screen.choosing .start-title-sub { font-size: clamp(12px, 2vw, 17px); }
 .start-menu { flex: 1; display: flex; flex-direction: column; align-items: center; }
 /* «Jugar» a la izquierda, justo debajo del título */
-.start-menu-center { flex: 1; align-self: stretch; display: flex; align-items: flex-start; justify-content: flex-start; padding-top: clamp(60px, 22vh, 240px); }
-.start-play-btn {
-  min-width: 220px; padding: 20px 48px; border-radius: 999px; cursor: pointer;
-  font-size: 26px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase;
-  border: 1px solid rgba(160, 200, 255, 0.7); background: linear-gradient(180deg, #4f8bff, #2f5fd0);
-  box-shadow: 0 0 40px rgba(80, 140, 255, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.3);
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+.start-menu-center {
+  flex: 1; align-self: stretch; display: flex; flex-direction: column; align-items: flex-start;
+  justify-content: flex-start; gap: 10px; padding-top: clamp(60px, 22vh, 240px);
 }
-.start-play-btn:hover { box-shadow: 0 0 56px rgba(80, 140, 255, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.3); }
-.start-play-btn:active { transform: scale(0.96); }
+/* «Jugar →»: texto grande subrayado, sin caja; la flecha avanza al pasar el ratón */
+.start-play-btn {
+  display: inline-flex; align-items: center; gap: 14px; min-height: 56px; padding: 6px 2px 8px;
+  border: none; border-bottom: 2px solid #6f9cff; border-radius: 0; background: none; cursor: pointer;
+  font-size: clamp(26px, 4vw, 38px); font-weight: 500; letter-spacing: 0.06em; color: #f4f6ff;
+}
+.start-play-arrow { display: inline-block; color: #8fb2ff; transition: transform 0.25s ease; }
+.start-play-btn:hover .start-play-arrow, .start-play-btn:focus-visible .start-play-arrow { transform: translateX(8px); }
+.start-play-btn:active { transform: translateY(1px); }
+/* Atajo a la última partida: discreto, pero grande para tocarlo */
+.start-continue-link {
+  min-height: 44px; padding: 4px 2px; border: none; background: none; cursor: pointer; text-align: left;
+  font-size: 16px; color: #a9bbe6;
+}
+.start-continue-label { color: #dfe7ff; font-weight: 600; }
+.start-continue-link:hover .start-continue-label { text-decoration: underline; text-underline-offset: 4px; }
+/* Horizonte de un planeta iluminado, abajo: un borde curvo con atmósfera azul */
+.start-horizon {
+  /* fixed: sobresale de la pantalla sin crear barras de desplazamiento */
+  position: fixed; z-index: 0; pointer-events: none;
+  left: -30%; right: -30%; bottom: -62vh; height: 80vh; border-radius: 50%;
+  background: radial-gradient(ellipse at 50% 0%, #1d3c80 0%, #0b1736 32%, #05070f 70%);
+  box-shadow: 0 -2px 0 rgba(130, 170, 255, 0.85), 0 -18px 60px rgba(90, 140, 255, 0.35);
+  transition: opacity 0.3s ease;
+}
+.start-screen.choosing .start-horizon { opacity: 0.25; }
 .start-footer { display: flex; flex-direction: column; align-items: center; gap: 8px; }
 .start-choose { display: flex; flex-direction: column; align-items: center; gap: 16px; width: 100%; max-width: 640px; margin: 0 auto; }
 .start-back {
@@ -222,8 +240,9 @@ button { font: inherit; color: inherit; }
   .start-card { padding: 10px 10px; gap: 4px; }
   .start-dot { width: 24px; height: 24px; }
   .start-title-main { font-size: 40px; }
-  .start-title-sub { font-size: 15px; }
-  .start-play-btn { padding: 14px 40px; font-size: 22px; }
+  .start-title-sub { font-size: 13px; }
+  .start-play-btn { min-height: 48px; font-size: 24px; }
+  .start-menu-center { padding-top: 24px; }
 }
 .start-card {
   display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 18px 12px;

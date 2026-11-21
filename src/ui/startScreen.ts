@@ -49,9 +49,10 @@ export interface StartScreenHandlers {
 }
 
 /**
- * Pantalla inicial. Primero el menú (título arriba a la izquierda y «Jugar» en
- * el centro); «Jugar» lleva a continuar, abrir una partida guardada o elegir la
- * estrella de una nueva. Se elimina al elegir.
+ * Pantalla inicial, estilo «Cine»: título grande y fino arriba a la izquierda,
+ * «Jugar →» debajo (lleva a continuar, abrir una partida o elegir la estrella de
+ * una nueva), un atajo «Continuar» y el horizonte de un planeta abajo.
+ * Se elimina al elegir.
  */
 export function showStartScreen(parent: HTMLElement, saves: SaveRecord[], h: StartScreenHandlers): void {
   const screen = el('div', 'start-screen');
@@ -62,9 +63,15 @@ export function showStartScreen(parent: HTMLElement, saves: SaveRecord[], h: Sta
   title.append(el('span', 'start-title-main', 'Galaxium'), el('span', 'start-title-sub', 'Simulator'));
   header.append(title);
 
-  // ── Menú principal ──
+  const auto = saves.find((s) => s.id === AUTOSAVE_ID);
+  const named = saves.filter((s) => s.id !== AUTOSAVE_ID);
+
+  // ── Menú principal (estilo «Cine») ──
   const menu = el('div', 'start-menu');
-  const play = el('button', 'start-play-btn', 'Jugar');
+  // Horizonte curvo de un planeta iluminado, abajo, detrás de todo
+  screen.append(el('div', 'start-horizon'));
+  const play = el('button', 'start-play-btn');
+  play.innerHTML = 'Jugar <span class="start-play-arrow" aria-hidden="true">→</span>';
   const menuFooter = el('div', 'start-footer');
   const where = location.hostname.endsWith('github.io') ? '' : ` · ${location.host}`;
   // Se muestra en la hora local de quien juega
@@ -74,6 +81,19 @@ export function showStartScreen(parent: HTMLElement, saves: SaveRecord[], h: Sta
   menuFooter.append(createInstallButton(), el('p', 'start-version', `Versión del ${built}${where}`));
   const menuCenter = el('div', 'start-menu-center');
   menuCenter.append(play);
+  // Atajo: seguir la última partida sin pasar por la pantalla de estrellas
+  if (auto) {
+    const cont = el('button', 'start-continue-link');
+    cont.append(
+      el('span', 'start-continue-label', 'Continuar'),
+      el('span', 'start-continue-detail', ` · ${auto.name} · ${describeSave(auto).split(' · ').slice(-2, -1)[0] ?? ''}`),
+    );
+    cont.onclick = () => {
+      close();
+      h.onLoad(auto);
+    };
+    menuCenter.append(cont);
+  }
   menu.append(menuCenter, menuFooter);
 
   // ── Elegir partida o estrella ──
@@ -92,9 +112,6 @@ export function showStartScreen(parent: HTMLElement, saves: SaveRecord[], h: Sta
     screen.scrollTop = 0;
   };
   choose.append(back);
-
-  const auto = saves.find((s) => s.id === AUTOSAVE_ID);
-  const named = saves.filter((s) => s.id !== AUTOSAVE_ID);
 
   if (auto) {
     const cont = el('button', 'start-continue');
