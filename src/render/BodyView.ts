@@ -19,6 +19,13 @@ import { flattening } from '../sim/rotation';
 
 /** La capa de vegetación va un 0,4 % por encima de la superficie */
 const VEGETATION_LIFT = 1.004;
+/**
+ * Orden de dibujo de las capas transparentes de un planeta. Las dos tienen su
+ * centro en el del planeta, así que three.js no sabe cuál va delante: primero
+ * la vegetación (pegada a la superficie) y luego los anillos.
+ */
+const VEGETATION_ORDER = 1;
+const RING_ORDER = 2;
 
 const textureLoader = new THREE.TextureLoader();
 
@@ -231,6 +238,8 @@ export class BodyView {
         new THREE.SphereGeometry(VEGETATION_LIFT, 48, 32),
         new THREE.MeshStandardMaterial({ transparent: true, depthWrite: false, roughness: 1, metalness: 0, opacity: 0 }),
       );
+      // Se dibuja antes que los anillos: si no, se vería a través de ellos
+      this.vegetation.renderOrder = VEGETATION_ORDER;
       // Hija de la esfera: hereda su tamaño
       this.mesh.add(this.vegetation);
     }
@@ -310,6 +319,8 @@ export class BodyView {
     if (this.ring) this.ring.set(b.ring);
     else {
       this.ring = new RingView(b.ring, b.id);
+      // Después de la vegetación, para taparla donde el anillo pasa por delante
+      this.ring.mesh.renderOrder = RING_ORDER;
       // Fuera de la esfera para que no gire con ella; su escala se copia en cada update
       this.group.add(this.ring.mesh);
     }
