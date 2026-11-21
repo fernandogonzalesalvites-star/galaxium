@@ -54,7 +54,7 @@ function showInstallHelp(): void {
   const box = document.createElement('div');
   box.className = 'install-help-box';
   const title = document.createElement('h2');
-  title.textContent = 'Instalar Galaxium';
+  title.textContent = 'Instalar Galaxium Simulator';
   const body = document.createElement('div');
   body.className = 'install-help-body';
 

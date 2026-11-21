@@ -1,7 +1,7 @@
 {
   "id": "./",
-  "name": "Galaxium",
-  "short_name": "Galaxium",
+  "name": "Galaxium Simulator",
+  "short_name": "Galaxium Simulator",
   "description": "Crea tu propio sistema solar: elige una estrella, coloca planetas y lunas y míralos orbitar.",
   "lang": "es",
   "start_url": "./",
