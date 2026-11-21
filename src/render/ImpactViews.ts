@@ -6,7 +6,7 @@ export const CRATER_LIFE_MAX = 390;
 /** Segundos que el cráter brilla al rojo vivo mientras se enfría */
 const CRATER_HEAT_SECONDS = 10;
 /** Segundos que vuelan los fragmentos y que dura el destello */
-const DEBRIS_SECONDS = 3.2;
+const DEBRIS_SECONDS = 4.5;
 const FLASH_SECONDS = 0.7;
 /** Tamaño de cada fragmento en pantalla (píxeles) */
 const DEBRIS_PX = 4;
@@ -104,69 +104,150 @@ export class CraterView {
   }
 }
 
+/** Una roca irregular (icosaedro deformado), compartida por todos los fragmentos. */
+let rockGeometry: THREE.BufferGeometry | null = null;
+function rock(): THREE.BufferGeometry {
+  if (rockGeometry) return rockGeometry;
+  // Sin vértices compartidos entre caras: se deforma por posición para que no se abra
+  const g = new THREE.IcosahedronGeometry(1, 1);
+  const pos = g.getAttribute('position') as THREE.BufferAttribute;
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+    // Mismo punto → misma deformación (depende solo de la posición)
+    const h = Math.abs((Math.sin(x * 12.9898 + y * 78.233 + z * 37.719) * 43758.5453) % 1);
+    const k = 0.7 + 0.45 * h;
+    pos.setXYZ(i, x * k, y * k * 0.85, z * k);
+  }
+  g.computeVertexNormals();
+  rockGeometry = g;
+  return g;
+}
+
+interface Chunk {
+  pos: THREE.Vector3;
+  vel: THREE.Vector3;
+  axis: THREE.Vector3;
+  spin: number;
+  angle: number;
+  size: number;
+}
+
 /**
- * Fragmentos que salen despedidos del choque y un destello. Va en el grupo del
- * planeta (no gira con él). Las distancias se miden en radios del planeta.
+ * Fragmentos que salen despedidos del choque: trozos de roca en 3D, grandes
+ * (algunos de hasta un cuarto del planeta, lo tapan un poco al pasar), que
+ * giran mientras vuelan y reciben la luz de la estrella; más chispas
+ * incandescentes y un destello. Va en el grupo del planeta (no gira con él).
  */
 export class DebrisBurst {
   readonly group = new THREE.Group();
-  private readonly points: THREE.Points<THREE.BufferGeometry, THREE.PointsMaterial>;
+  private readonly rocks: THREE.InstancedMesh<THREE.BufferGeometry, THREE.MeshStandardMaterial>;
+  private readonly chunks: Chunk[] = [];
+  private readonly sparks: THREE.Points<THREE.BufferGeometry, THREE.PointsMaterial>;
+  private readonly sparkVel: Float32Array;
   private readonly flash: THREE.Sprite;
-  private readonly velocities: Float32Array;
   private readonly planetRadius: number;
+  private readonly dummy = new THREE.Object3D();
+  private readonly q = new THREE.Quaternion();
   private age = 0;
 
   constructor(
     normal: THREE.Vector3, planetRadius: number, impactorRadius: number, colors: [number, number],
     random: () => number = Math.random,
   ) {
-    const n = Math.round(Math.min(260, 50 + 600 * (impactorRadius / planetRadius)));
-    const pos = new Float32Array(n * 3);
-    const col = new Float32Array(n * 3);
-    this.velocities = new Float32Array(n * 3);
-    const origin = normal.clone().normalize().multiplyScalar(planetRadius);
-    const palette = [new THREE.Color(colors[0]), new THREE.Color(colors[1]), new THREE.Color(0xffa040), new THREE.Color(0xfff0c0)];
-    const dir = new THREE.Vector3();
-    for (let i = 0; i < n; i++) {
-      pos.set([origin.x, origin.y, origin.z], i * 3);
-      // Hacia fuera del planeta, en un cono amplio alrededor del punto del choque
-      dir.set(random() * 2 - 1, random() * 2 - 1, random() * 2 - 1).normalize().multiplyScalar(0.85);
-      dir.add(normal).normalize();
-      const speed = planetRadius * (0.5 + random() * 1.8);
-      this.velocities.set([dir.x * speed, dir.y * speed, dir.z * speed], i * 3);
-      const c = palette[random() < 0.35 ? 2 + Math.floor(random() * 2) : Math.floor(random() * 2)];
-      col.set([c.r, c.g, c.b], i * 3);
+    this.planetRadius = planetRadius;
+    const n = normal.clone().normalize();
+    const origin = n.clone().multiplyScalar(planetRadius);
+    const ratio = Math.min(1, impactorRadius / planetRadius);
+    // Hacia fuera, en un cono amplio alrededor del punto del choque
+    const outward = () =>
+      new THREE.Vector3(random() * 2 - 1, random() * 2 - 1, random() * 2 - 1).normalize().multiplyScalar(0.9).add(n).normalize();
+
+    // Rocas: más y más grandes cuanto mayor es lo que chocó
+    const count = Math.round(18 + 70 * ratio);
+    this.rocks = new THREE.InstancedMesh(
+      rock(),
+      new THREE.MeshStandardMaterial({ roughness: 1, metalness: 0, flatShading: true, transparent: true }),
+      count,
+    );
+    this.rocks.frustumCulled = false;
+    const palette = [new THREE.Color(colors[0]), new THREE.Color(colors[1]), new THREE.Color(0x6b5a4c), new THREE.Color(0x8a7a6a)];
+    for (let i = 0; i < count; i++) {
+      // Muchos medianos y unos pocos enormes (hasta ~25 % del radio del planeta)
+      const size = planetRadius * (0.04 + 0.21 * Math.pow(random(), 2.2)) * (0.6 + 0.8 * ratio);
+      this.chunks.push({
+        pos: origin.clone(),
+        vel: outward().multiplyScalar(planetRadius * (0.35 + random() * 1.3)),
+        axis: new THREE.Vector3(random() - 0.5, random() - 0.5, random() - 0.5).normalize(),
+        spin: (random() * 2 - 1) * 6,
+        angle: random() * Math.PI * 2,
+        size,
+      });
+      this.rocks.setColorAt(i, palette[Math.floor(random() * palette.length)].clone().multiplyScalar(0.7 + random() * 0.4));
+    }
+
+    // Chispas incandescentes (pequeñas y brillantes)
+    const sparkCount = Math.round(40 + 120 * ratio);
+    const sp = new Float32Array(sparkCount * 3);
+    const sc = new Float32Array(sparkCount * 3);
+    this.sparkVel = new Float32Array(sparkCount * 3);
+    const hot = [new THREE.Color(0xffa040), new THREE.Color(0xfff0c0), new THREE.Color(0xff6020)];
+    for (let i = 0; i < sparkCount; i++) {
+      sp.set([origin.x, origin.y, origin.z], i * 3);
+      const v = outward().multiplyScalar(planetRadius * (0.6 + random() * 2.2));
+      this.sparkVel.set([v.x, v.y, v.z], i * 3);
+      const c = hot[Math.floor(random() * hot.length)];
+      sc.set([c.r, c.g, c.b], i * 3);
     }
     const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    g.setAttribute('color', new THREE.BufferAttribute(col, 3));
-    // Tamaño fijo en pantalla (píxeles): se ven igual de cerca que de lejos
-    this.points = new THREE.Points(g, new THREE.PointsMaterial({
+    g.setAttribute('position', new THREE.BufferAttribute(sp, 3));
+    g.setAttribute('color', new THREE.BufferAttribute(sc, 3));
+    this.sparks = new THREE.Points(g, new THREE.PointsMaterial({
       map: dot(), vertexColors: true, size: DEBRIS_PX, sizeAttenuation: false,
-      transparent: true, depthWrite: false,
+      transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
     }));
-    this.points.frustumCulled = false;
-    this.planetRadius = planetRadius;
+    this.sparks.frustumCulled = false;
+
     this.flash = new THREE.Sprite(new THREE.SpriteMaterial({
       map: dot(), color: 0xffd9a0, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
     }));
     this.flash.position.copy(origin);
     this.flash.scale.setScalar(planetRadius * 0.6);
-    this.group.add(this.points, this.flash);
+    this.group.add(this.rocks, this.sparks, this.flash);
+    this.placeRocks();
+  }
+
+  private placeRocks(): void {
+    this.chunks.forEach((c, i) => {
+      this.dummy.position.copy(c.pos);
+      this.dummy.quaternion.copy(this.q.setFromAxisAngle(c.axis, c.angle));
+      this.dummy.scale.setScalar(c.size);
+      this.dummy.updateMatrix();
+      this.rocks.setMatrixAt(i, this.dummy.matrix);
+    });
+    this.rocks.instanceMatrix.needsUpdate = true;
   }
 
   /** Avanza `dt` segundos; devuelve false cuando ya terminó. */
   update(dt: number): boolean {
     this.age += dt;
-    const pos = this.points.geometry.getAttribute('position') as THREE.BufferAttribute;
-    const v = this.velocities;
-    const drag = Math.max(0, 1 - 0.9 * dt);
+    const drag = Math.max(0, 1 - 0.7 * dt);
+    for (const c of this.chunks) {
+      c.pos.addScaledVector(c.vel, dt);
+      c.vel.multiplyScalar(drag);
+      c.angle += c.spin * dt;
+    }
+    this.placeRocks();
+    // Las rocas se ven enteras casi todo el tiempo y se desvanecen al final
+    const t = this.age / DEBRIS_SECONDS;
+    this.rocks.material.opacity = t < 0.6 ? 1 : Math.max(0, 1 - (t - 0.6) / 0.4);
+    const pos = this.sparks.geometry.getAttribute('position') as THREE.BufferAttribute;
+    const v = this.sparkVel;
     for (let i = 0; i < v.length; i += 3) {
       pos.array[i] += v[i] * dt; pos.array[i + 1] += v[i + 1] * dt; pos.array[i + 2] += v[i + 2] * dt;
       v[i] *= drag; v[i + 1] *= drag; v[i + 2] *= drag;
     }
     pos.needsUpdate = true;
-    this.points.material.opacity = Math.max(0, 1 - this.age / DEBRIS_SECONDS);
+    this.sparks.material.opacity = Math.max(0, 1 - this.age / (DEBRIS_SECONDS * 0.6));
     // Destello: crece y se apaga enseguida
     const f = Math.min(1, this.age / FLASH_SECONDS);
     this.flash.material.opacity = 1 - f;
@@ -175,8 +256,12 @@ export class DebrisBurst {
   }
 
   dispose(): void {
-    this.points.geometry.dispose();
-    this.points.material.dispose();
+    // La geometría de roca es compartida: no se libera
+    this.rocks.material.dispose();
+    this.rocks.dispose();
+    this.sparks.geometry.dispose();
+    this.sparks.material.dispose();
     this.flash.material.dispose();
   }
 }
+
