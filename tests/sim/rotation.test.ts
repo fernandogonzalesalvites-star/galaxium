@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { canRotate, defaultDayHours, formatDayHours, parseDayHours } from '../../src/sim/rotation';
+import { canRotate, defaultDayHours, flattening, formatDayHours, parseDayHours } from '../../src/sim/rotation';
 import { placeMoon, placePlanet } from '../../src/game/placement';
 import { restoreWorld, snapshot } from '../../src/game/save';
 import { createStarSystem } from '../../src/sim/stars';
@@ -46,6 +46,20 @@ describe('rotación', () => {
     expect(info.rows).toContainEqual(['Día', '24 h']);
     expect(info.canRotate).toBe(true);
     expect(describeBody(w, w.stars()[0]).canRotate ?? false).toBe(false);
+  });
+
+  it('con días de 5 h o menos se achata, más cuanto más rápido gira', () => {
+    expect(flattening(24)).toBe(0);
+    expect(flattening(5.1)).toBe(0);
+    expect(flattening(5)).toBeCloseTo(0.08, 9);
+    expect(flattening(3)).toBeGreaterThan(flattening(5));
+    expect(flattening(1)).toBeCloseTo(0.35, 9);
+    expect(flattening(0)).toBe(0);
+    const w = createStarSystem('sunLike');
+    const earth = placePlanet(w, PLANET_PRESETS.earthLike, 1, 0);
+    expect(describeBody(w, earth).rows.some(([k]) => k === 'Forma')).toBe(false);
+    earth.dayHours = 3;
+    expect(describeBody(w, earth).rows.find(([k]) => k === 'Forma')![1]).toMatch(/Achatado \d+ %/);
   });
 
   it('se guarda; las partidas viejas reciben el día de su tipo', () => {

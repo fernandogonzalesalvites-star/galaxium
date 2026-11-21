@@ -2,7 +2,7 @@ import type { Body } from '../sim/body';
 import type { World } from '../sim/world';
 import { centerOfMass, centralMassFor, relativeOrbit } from '../sim/elements';
 import { GALAXY_SPECS, galaxies } from '../sim/galaxies';
-import { formatDayHours } from '../sim/rotation';
+import { flattening, formatDayHours } from '../sim/rotation';
 import { formatGalacticElapsed, formatGalaxyMass, formatLightYears } from './format';
 import { EARTH_MASS, EARTH_RADIUS_AU, SOLAR_RADIUS_AU } from '../sim/units';
 import { evaluateHabitability, habitableZone } from '../life/habitability';
@@ -91,6 +91,8 @@ export function describeBody(world: World, body: Body): BodyInfo {
     ['Atmósfera', formatPercent(body.atmosphere)],
     ['Día', formatDayHours(body.dayHours)],
   );
+  const flat = flattening(body.dayHours);
+  if (flat > 0) rows.push(['Forma', `Achatado ${Math.round(flat * 100)} % (gira muy rápido)`]);
   if (body.kind === 'rocky') {
     rows.push(['Agua', formatPercent(body.water)], ['Vegetación', body.vegetation ? 'Sí' : 'No']);
   }

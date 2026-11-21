@@ -1,4 +1,4 @@
-import { DAY_EXAMPLES, DAY_HOURS_MAX, DAY_HOURS_MIN, formatDayHours, parseDayHours } from '../sim/rotation';
+import { DAY_EXAMPLES, DAY_HOURS_MAX, DAY_HOURS_MIN, flattening, formatDayHours, parseDayHours } from '../sim/rotation';
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, className: string, text = ''): HTMLElementTagNameMap[K] {
   const e = document.createElement(tag);
@@ -32,13 +32,18 @@ export function showRotationDialog(
   const help = el('span', 'editor-note');
   const error = el('span', 'rotation-error hidden');
   error.setAttribute('role', 'alert');
-  field.append(input, help, error);
+  const flatNote = el('span', 'rotation-flat hidden');
+  field.append(input, help, flatNote, error);
 
   const renderHelp = () => {
     const r = parseDayHours(input.value);
     help.textContent = 'hours' in r
       ? `1 hora = 1 segundo en el juego: dará una vuelta cada ${formatSeconds(r.hours)}.`
       : `1 hora = 1 segundo en el juego. Entre ${DAY_HOURS_MIN} y ${DAY_HOURS_MAX} horas.`;
+    // Aviso: con días de 5 h o menos el planeta se achata
+    const f = 'hours' in r ? flattening(r.hours) : 0;
+    flatNote.classList.toggle('hidden', f === 0);
+    flatNote.textContent = `Con un día tan corto gira muy rápido y se achata un ${Math.round(f * 100)} %.`;
   };
 
   const examples = el('div', 'editor-surface-chips');

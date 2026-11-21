@@ -15,6 +15,7 @@ import type { GalaxyType } from '../sim/galaxies';
 const STAR_LIGHT = 3;
 const BLACK_HOLE_LIGHT = 0.4;
 import { surfaceTexture, vegetationTexture } from './surfaceTextures';
+import { flattening } from '../sim/rotation';
 
 /** La capa de vegetación va un 0,4 % por encima de la superficie */
 const VEGETATION_LIFT = 1.004;
@@ -102,7 +103,9 @@ export class BodyView {
     const p = interpolated(b, alpha);
     this.group.position.set(p.x - focus.x, p.y - focus.y, p.z - focus.z);
     const r = visualRadius(b);
-    this.mesh.scale.setScalar(r);
+    // Si gira muy rápido (día de 5 h o menos) se achata: más ancho en el ecuador, aplastado en los polos
+    const f = b.kind === 'star' || b.kind === 'galaxy' ? 0 : flattening(b.dayHours);
+    this.mesh.scale.set(r * (1 + f / 2), r * (1 - f), r * (1 + f / 2));
     // Rotación: una vuelta cada `dayHours` segundos reales (1 hora del planeta = 1 segundo).
     // Gira la esfera con su textura y su vegetación; los anillos van aparte y no se tambalean
     if (b.dayHours > 0 && spinSeconds > 0) {

@@ -35,6 +35,22 @@ export function parseDayHours(text: string): { hours: number } | { error: string
   return { hours: Math.round(n * 10) / 10 };
 }
 
+/** A partir de este día (o más corto) el planeta gira tan rápido que se achata */
+export const FLATTEN_FROM_HOURS = 5;
+/** Achatamiento con un día de 5 h y con el más corto posible (1 h) */
+const FLATTEN_AT_START = 0.08;
+const FLATTEN_MAX = 0.35;
+
+/**
+ * Cuánto se achata un planeta por girar rápido (0 = esfera; 0,35 = polos un 35 %
+ * más cerca del centro). Con días de más de 5 h no se achata.
+ */
+export function flattening(dayHours: number): number {
+  if (!(dayHours > 0) || dayHours > FLATTEN_FROM_HOURS) return 0;
+  const t = (FLATTEN_FROM_HOURS - Math.max(dayHours, DAY_HOURS_MIN)) / (FLATTEN_FROM_HOURS - DAY_HOURS_MIN);
+  return FLATTEN_AT_START + (FLATTEN_MAX - FLATTEN_AT_START) * t;
+}
+
 /** «24 h», «24,6 h» o «655 h (27,3 días)». */
 export function formatDayHours(hours: number): string {
   if (hours <= 0) return 'No gira';
